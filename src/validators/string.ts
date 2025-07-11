@@ -1,7 +1,9 @@
-import { ValidatorCollection, SchemaLike } from "./types.js";
-
-const EMAIL_REGEX =
-  /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+import {
+  ValidatorCollection,
+  SchemaLike,
+  SchemaValidatorMap,
+} from "./types.js";
+import { regex } from "../regex.js";
 
 export const stringValidatorMap = {
   string: {
@@ -17,6 +19,12 @@ export const stringValidatorMap = {
       value.length > min && value.length < max,
     pattern: (value: string, [pattern]: [RegExp]) => pattern.test(value),
     oneOf: (value: string, [options]: [string[]]) => options.includes(value),
+    url: (value: string, [enabled = true]: [boolean?]) =>
+      !enabled || regex.url.test(value),
+    uuid: (value: string, [enabled = true]: [boolean?]) =>
+      !enabled || regex.uuid.test(value),
+    datetime: (value: string, [enabled = true]: [boolean?]) =>
+      !enabled || regex.isoDateTime.test(value),
     json: (value: string, [schema]: [SchemaLike], context) => {
       try {
         const parsed = JSON.parse(value);
@@ -35,7 +43,7 @@ export const stringValidatorMap = {
         )?
       ]
     ) => {
-      if (!EMAIL_REGEX.test(value)) {
+      if (!regex.email.test(value)) {
         return false;
       }
       if (typeof config === "boolean") {
@@ -64,4 +72,4 @@ export const stringValidatorMap = {
       return true;
     },
   } satisfies ValidatorCollection<string>,
-} as const;
+} as const satisfies SchemaValidatorMap;

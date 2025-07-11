@@ -15,7 +15,7 @@ type InferConfig<Func> = Func extends (
   ...rest: any[]
 ) => any
   ? ConfigType
-  : never;
+  : unknown;
 
 // Creates a typed config object from a validator collection.
 type ValidatorConfig<VCollection> = Prettify<
