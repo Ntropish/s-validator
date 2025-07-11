@@ -15,6 +15,16 @@ describe("Email Validator", () => {
       expect(() => schema.parse("test.example.com")).toThrow();
       expect(() => schema.parse("@example.com")).toThrow();
     });
+
+    it("should validate a non-email when email is false", () => {
+      const schema = s.string({ email: false });
+      expect(() => schema.parse("not an email")).not.toThrow();
+    });
+
+    it("should throw an error for an email when email is false", () => {
+      const schema = s.string({ email: false });
+      expect(() => schema.parse("test@example.com")).toThrow();
+    });
   });
 
   describe("domain validation", () => {

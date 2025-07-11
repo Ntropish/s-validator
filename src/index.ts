@@ -83,10 +83,7 @@ export class Schema<T> {
       }
       const validator = validatorCollection?.[validatorName];
       if (validator) {
-        const args =
-          validatorConfig !== undefined && validatorConfig !== true
-            ? [validatorConfig]
-            : [];
+        const args = [validatorConfig];
 
         this.validators.push({
           name: validatorName,
