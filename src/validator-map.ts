@@ -5,17 +5,13 @@ import { numberValidatorMap } from "./validators/number.js";
 import { booleanValidatorMap } from "./validators/boolean.js";
 import { arrayValidatorMap } from "./validators/array.js";
 import { objectValidatorMap } from "./validators/object.js";
-import { emailValidatorMap } from "./validators/email.js";
-import { jsonValidatorMap } from "./validators/json.js";
 
 export const validatorMap = mergeValidatorMaps(
   stringValidatorMap,
   numberValidatorMap,
   booleanValidatorMap,
   arrayValidatorMap,
-  objectValidatorMap,
-  emailValidatorMap,
-  jsonValidatorMap
+  objectValidatorMap
 );
 
 // A recursive type to intersect all types in a tuple.

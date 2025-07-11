@@ -3,8 +3,8 @@ import { s } from "../index.js";
 
 describe("json validator", () => {
   it("should validate a string containing JSON that matches the schema", () => {
-    const schema = s.json({
-      schema: s.object({
+    const schema = s.string({
+      json: s.object({
         properties: {
           name: s.string(),
           age: s.number(),
@@ -17,8 +17,8 @@ describe("json validator", () => {
   });
 
   it("should throw an error for a string containing JSON that does not match the schema", () => {
-    const schema = s.json({
-      schema: s.object({
+    const schema = s.string({
+      json: s.object({
         properties: {
           name: s.string(),
           age: s.number(),
@@ -31,8 +31,8 @@ describe("json validator", () => {
   });
 
   it("should throw an error for a string that is not valid JSON", () => {
-    const schema = s.json({
-      schema: s.object({
+    const schema = s.string({
+      json: s.object({
         properties: {
           name: s.string(),
         },
@@ -44,8 +44,8 @@ describe("json validator", () => {
   });
 
   it("should throw an error if the value is not a string", () => {
-    const schema = s.json({
-      schema: s.object({
+    const schema = s.string({
+      json: s.object({
         properties: {
           name: s.string(),
         },
@@ -57,8 +57,8 @@ describe("json validator", () => {
   });
 
   it("should handle nested JSON schemas", () => {
-    const schema = s.json({
-      schema: s.object({
+    const schema = s.string({
+      json: s.object({
         properties: {
           user: s.object({
             properties: {
