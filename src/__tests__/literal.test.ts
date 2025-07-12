@@ -55,7 +55,7 @@ describe("Literal Validator", () => {
         name: s.string(),
       },
     });
-    const data = { type: "user", name: "John" };
+    const data = { type: "user" as const, name: "John" };
     await expect(schema.parse(data)).resolves.toEqual(data);
   });
 
@@ -66,7 +66,8 @@ describe("Literal Validator", () => {
         name: s.string(),
       },
     });
-    const data = { type: "admin", name: "John" };
-    await expect((schema as any).parse(data)).rejects.toThrow(ValidationError);
+    const data = { type: "admin" as const, name: "John" };
+    // @ts-expect-error - Testing runtime validation by passing an incorrect literal type.
+    await expect(schema.parse(data)).rejects.toThrow(ValidationError);
   });
 });

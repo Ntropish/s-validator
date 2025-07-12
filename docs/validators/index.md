@@ -57,22 +57,34 @@ try {
 
 ## Available Validators
 
-Choose a validator type from the list below to learn more about its specific validation rules and configuration options.
+Validators are grouped by category.
+
+### Primitives
 
 - [Any](./any.md)
-- [Array](./array.md)
+- [BigInt](./bigint.md)
 - [Boolean](./boolean.md)
 - [Date](./date.md)
 - [Number](./number.md)
-- [Object](./object.md)
 - [String](./string.md)
-- [Union](./union.md)
-- [Switch](./switch.md)
-- [BigInt](./bigint.md)
-- [InstanceOf](./instanceof.md)
-- [Literal](./literal.md)
+
+### Data Structures
+
+- [Array](./array.md)
 - [Map](./map.md)
+- [Object](./object.md)
+- [Set](./set.md)
+
+### Composition & Logic
+
+- [InstanceOf](./instanceof.md)
+- [Object Modifiers](./object-modifiers.md)
+- [Switch](./switch.md)
+- [Union](./union.md)
+
+### Special Values
+
+- [Literal](./literal.md)
 - [NaN](./nan.md)
 - [Never](./never.md)
-- [Set](./set.md)
 - [Unknown](./unknown.md)

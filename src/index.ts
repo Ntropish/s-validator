@@ -14,6 +14,18 @@ import {
 // A utility to force TS to expand a type in tooltips for better DX.
 type Prettify<T> = { [K in keyof T]: T[K] } & {};
 
+// The keys of T that can be undefined
+type UndefinedKeys<T> = {
+  [K in keyof T]: undefined extends T[K] ? K : never;
+}[keyof T];
+
+// Make properties of T optional if their value can be undefined
+type UndefinedToOptional<T> = Prettify<
+  { [K in Exclude<keyof T, UndefinedKeys<T>>]: T[K] } & {
+    [K in UndefinedKeys<T>]?: T[K];
+  }
+>;
+
 // Infers the argument type from a validator function's signature.
 type InferConfig<Func> = Func extends (
   value: any,
@@ -50,6 +62,21 @@ type InferDataType<VCollection> = VCollection extends {
 type InferSchemaType<T extends Schema<any>> = T extends Schema<infer U>
   ? U
   : never;
+
+type SObjectProperties = Record<string, Schema<any>>;
+type InferSObjectType<P extends SObjectProperties> = Prettify<
+  UndefinedToOptional<{
+    [K in keyof P]: InferSchemaType<P[K]>;
+  }>
+>;
+
+// Add an index signature to allow for extra properties
+type WithLoose<T> = T & { [key: string]: any };
+
+type SObjectOptions<P extends SObjectProperties> = ValidatorConfig<any> & {
+  properties: P;
+  strict?: boolean;
+};
 
 function isValidationContext(thing: any): thing is ValidationContext {
   return (
@@ -237,54 +264,6 @@ export class Schema<T> implements StandardSchemaV1<T, T> {
     return context.value;
   }
 
-  public partial(): Schema<Partial<T>> {
-    if (this.dataType !== "object" || !this.config.properties) {
-      return this as any; // Or throw an error
-    }
-
-    const originalProperties = this.config.properties as Record<
-      string,
-      Schema<any>
-    >;
-    const newProperties: Record<string, Schema<any>> = {};
-
-    for (const key in originalProperties) {
-      newProperties[key] = originalProperties[key].optional();
-    }
-
-    const newConfig = { ...this.config, properties: newProperties };
-
-    return new Schema(this.dataType, newConfig, validatorMap);
-  }
-
-  public pick<K extends keyof T>(keys: K[]): Schema<Pick<T, K>> {
-    if (this.dataType !== "object" || !this.config.properties) {
-      // In a real-world scenario, you might want to throw an error
-      // or handle this more gracefully. For now, we'll return `this`
-      // which is not ideal but prevents a runtime crash.
-      return this as any;
-    }
-
-    const originalProperties = this.config.properties as Record<
-      string,
-      Schema<any>
-    >;
-    const newProperties: Record<string, Schema<any>> = {};
-
-    for (const key of keys) {
-      if (originalProperties[key as string]) {
-        newProperties[key as string] = originalProperties[key as string];
-      }
-    }
-
-    const newConfig = {
-      ...this.config,
-      properties: newProperties,
-      strict: true,
-    };
-    return new Schema(this.dataType, newConfig, validatorMap);
-  }
-
   public optional(): Schema<T | undefined> {
     return new Schema(
       this.dataType,
@@ -302,15 +281,108 @@ export class Schema<T> implements StandardSchemaV1<T, T> {
   }
 }
 
-class SwitchSchema<T> extends Schema<T> {
-  private keyFn: (context: ValidationContext) => string | number;
-  private schemas: Record<string | number, Schema<T>>;
-  private defaultSchema?: Schema<T>;
+class ObjectSchema<
+  P extends SObjectProperties,
+  T = InferSObjectType<P>
+> extends Schema<T> {
+  constructor(config: SObjectOptions<P>) {
+    super("object", config, validatorMap);
+  }
+
+  public partial(): ObjectSchema<P> {
+    const originalProperties = this.config.properties as P;
+    const newProperties: P = {} as any;
+
+    for (const key in originalProperties) {
+      newProperties[key] = originalProperties[key].optional() as any;
+    }
+
+    const newConfig: SObjectOptions<P> = {
+      ...this.config,
+      properties: newProperties,
+    };
+    return new ObjectSchema(newConfig);
+  }
+
+  public pick<K extends keyof P>(keys: K[]): ObjectSchema<Pick<P, K>> {
+    const originalProperties = this.config.properties as P;
+    const newProperties = {} as Pick<P, K>;
+
+    for (const key of keys) {
+      if (key in originalProperties) {
+        newProperties[key] = originalProperties[key];
+      }
+    }
+
+    const newConfig = {
+      ...this.config,
+      properties: newProperties,
+      strict: true,
+    };
+    return new ObjectSchema(newConfig);
+  }
+
+  public omit<K extends keyof P>(keys: K[]): ObjectSchema<Omit<P, K>> {
+    const originalProperties = this.config.properties as P;
+    const newProperties = { ...originalProperties };
+
+    for (const key of keys) {
+      delete newProperties[key];
+    }
+
+    const newConfig = {
+      ...this.config,
+      properties: newProperties,
+      strict: true,
+    };
+    return new ObjectSchema(newConfig);
+  }
+
+  public extend<P2 extends SObjectProperties>(
+    extension: P2
+  ): ObjectSchema<P & P2> {
+    const originalProperties = this.config.properties as P;
+
+    const newConfig = {
+      ...this.config,
+      properties: {
+        ...originalProperties,
+        ...extension,
+      },
+      strict: false,
+    };
+    return new ObjectSchema(newConfig);
+  }
+
+  public strict(): ObjectSchema<P, T> {
+    const newConfig = {
+      ...this.config,
+      strict: true,
+      properties: this.config.properties as P,
+    };
+    return new ObjectSchema(newConfig);
+  }
+}
+
+type SwitchCase<T> = Record<string | number, Schema<T>>;
+type SwitchDefault<T> = Schema<T> | undefined;
+
+class SwitchSchema<
+  TKey extends string | number,
+  TCases extends SwitchCase<any>,
+  TDefault extends SwitchDefault<any>
+> extends Schema<
+  | s.infer<TCases[TKey]>
+  | (TDefault extends Schema<any> ? s.infer<TDefault> : never)
+> {
+  private keyFn: (context: ValidationContext) => TKey;
+  private schemas: TCases;
+  private defaultSchema?: TDefault;
 
   constructor(
-    keyFn: (context: ValidationContext) => string | number,
-    schemas: Record<string | number, Schema<T>>,
-    defaultSchema?: Schema<T>
+    keyFn: (context: ValidationContext) => TKey,
+    schemas: TCases,
+    defaultSchema?: TDefault
   ) {
     super("switch", {}, validatorMap as SchemaValidatorMap);
     this.keyFn = keyFn;
@@ -318,7 +390,7 @@ class SwitchSchema<T> extends Schema<T> {
     this.defaultSchema = defaultSchema;
   }
 
-  protected async _parse(context: ValidationContext): Promise<T> {
+  protected async _parse(context: ValidationContext): Promise<any> {
     const key = this.keyFn(context);
     const schema = this.schemas[key] || this.defaultSchema;
 
@@ -485,15 +557,23 @@ class UnionSchema<T extends [Schema<any>, ...Schema<any>[]]> extends Schema<
 }
 
 type CreateSchemaBuilder<TMap extends SchemaValidatorMap> = {
-  [K in keyof TMap]: (
+  [K in keyof Omit<TMap, "object">]: (
     config?: ValidatorConfig<TMap[K]>
   ) => Schema<InferDataType<TMap[K]>>;
 } & {
-  switch<TKey extends string | number, TSchema extends Schema<any>>(
+  object<P extends SObjectProperties>(
+    config: SObjectOptions<P>
+  ): ObjectSchema<P, WithLoose<InferSObjectType<P>>>;
+} & {
+  switch<
+    TKey extends string | number,
+    TCases extends SwitchCase<any>,
+    TDefault extends SwitchDefault<any>
+  >(
     keyFn: (context: ValidationContext) => TKey,
-    schemas: Record<TKey, TSchema>,
-    defaultSchema?: TSchema
-  ): TSchema;
+    schemas: TCases,
+    defaultSchema?: TDefault
+  ): SwitchSchema<TKey, TCases, TDefault>;
   union<T extends [Schema<any>, ...Schema<any>[]]>(schemas: T): UnionSchema<T>;
   literal<T extends string | number | boolean | null | undefined>(
     literal: T
@@ -512,10 +592,19 @@ function createSchemaFunction<
   TMap extends SchemaValidatorMap,
   K extends keyof TMap
 >(dataType: K, validatorMap: TMap) {
-  return function (config?: ValidatorConfig<TMap[K]>) {
-    return new Schema<InferDataType<TMap[K]>>(
+  return function <C extends ValidatorConfig<TMap[K]>>(config?: C) {
+    type BaseType = InferDataType<TMap[K]>;
+
+    type WithOptional = C extends { optional: true }
+      ? BaseType | undefined
+      : BaseType;
+    type WithNullable = C extends { nullable: true }
+      ? WithOptional | null
+      : WithOptional;
+
+    return new Schema<WithNullable>(
       dataType as string,
-      config || {},
+      (config || {}) as any,
       validatorMap
     );
   };
@@ -527,14 +616,28 @@ export function createSchemaBuilder<TMap extends SchemaValidatorMap>(
   const builder: any = {};
 
   for (const dataType in validatorMap) {
+    if (dataType === "object") continue;
     builder[dataType] = createSchemaFunction(dataType, validatorMap);
   }
 
-  builder.switch = <TKey extends string | number, TSchema extends Schema<any>>(
+  builder.object = function <P extends SObjectProperties>(
+    config: SObjectOptions<P>
+  ) {
+    if (config.strict) {
+      return new ObjectSchema<P, InferSObjectType<P>>(config);
+    }
+    return new ObjectSchema<P, WithLoose<InferSObjectType<P>>>(config);
+  };
+
+  builder.switch = function <
+    TKey extends string | number,
+    TCases extends SwitchCase<any>,
+    TDefault extends SwitchDefault<any>
+  >(
     keyFn: (context: ValidationContext) => TKey,
-    schemas: Record<TKey, TSchema>,
-    defaultSchema?: TSchema
-  ) => {
+    schemas: TCases,
+    defaultSchema?: TDefault
+  ) {
     return new SwitchSchema(keyFn, schemas, defaultSchema);
   };
 

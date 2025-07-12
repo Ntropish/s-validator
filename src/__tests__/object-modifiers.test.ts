@@ -33,23 +33,14 @@ describe("Object Modifiers", () => {
 
       // The base schema should still require all properties
       await expect(baseSchema.parse({})).rejects.toThrow();
-      await expect(
-        (baseSchema as any).parse({ name: "John" })
-      ).rejects.toThrow();
+      await expect(baseSchema.parse({ name: "John" })).rejects.toThrow();
     });
 
     it("should still enforce types for provided properties", async () => {
       const partialSchema = baseSchema.partial();
 
-      await expect(
-        (partialSchema as any).parse({ name: 123 })
-      ).rejects.toThrow();
-    });
-
-    it("should work on non-object schemas without throwing", async () => {
-      const schema = s.string();
-      const partialSchema = (schema as any).partial();
-      await expect(partialSchema.parse("hello")).resolves.toBe("hello");
+      // @ts-expect-error - Testing runtime validation by passing a number where a string is expected.
+      await expect(partialSchema.parse({ name: 123 })).rejects.toThrow();
     });
   });
 
@@ -63,46 +54,129 @@ describe("Object Modifiers", () => {
     });
 
     it("should create a new schema with only the selected properties", async () => {
-      const pickedSchema = (baseSchema as any).pick(["name", "age"]);
+      const pickedSchema = baseSchema.pick(["name", "age"]);
       const validInput = { name: "John", age: 30 };
       const invalidInput = { name: "John", age: 30, email: "john@example.com" };
 
       await expect(pickedSchema.parse(validInput)).resolves.toEqual(validInput);
 
-      // The picked schema should not allow properties that were not picked
-      await expect((pickedSchema as any).parse(invalidInput)).rejects.toThrow();
+      await expect(pickedSchema.parse(invalidInput)).rejects.toThrow();
     });
 
     it("should not affect the original schema", async () => {
-      (baseSchema as any).pick(["name"]);
+      baseSchema.pick(["name"]);
       await expect(
         baseSchema.parse({ name: "John", age: 30, email: "a@a.com" })
       ).resolves.toBeTruthy();
-      await expect(
-        (baseSchema as any).parse({ name: "John" })
-      ).rejects.toThrow();
+      await expect(baseSchema.parse({ name: "John" })).rejects.toThrow();
     });
 
     it("should still enforce types for picked properties", async () => {
-      const pickedSchema = (baseSchema as any).pick(["name"]);
-      await expect(
-        (pickedSchema as any).parse({ name: 123 })
-      ).rejects.toThrow();
-    });
-
-    it("should work on non-object schemas without throwing", async () => {
-      const schema = s.string();
-      const pickedSchema = (schema as any).pick(["name"]);
-      await expect(pickedSchema.parse("hello")).resolves.toBe("hello");
+      const pickedSchema = baseSchema.pick(["name"]);
+      // @ts-expect-error - Testing runtime validation by passing a number where a string is expected.
+      await expect(pickedSchema.parse({ name: 123 })).rejects.toThrow();
     });
 
     it("should handle picking non-existent keys gracefully", async () => {
-      const pickedSchema = (baseSchema as any).pick(["nonexistent"]);
+      // @ts-expect-error - Testing picking a key that does not exist.
+      const pickedSchema = baseSchema.pick(["nonexistent"]);
       // An empty object should be valid
       await expect(pickedSchema.parse({})).resolves.toEqual({});
       // Any other property should be rejected
+      await expect(pickedSchema.parse({ name: "test" })).rejects.toThrow();
+    });
+  });
+  describe("omit", () => {
+    const baseSchema = s.object({
+      properties: {
+        name: s.string(),
+        age: s.number(),
+        email: s.string({ email: true }),
+      },
+    });
+
+    it("should create a new schema with the specified properties removed", async () => {
+      const omittedSchema = baseSchema.omit(["email"]);
+      const validInput = { name: "John", age: 30 };
+
+      await expect(omittedSchema.parse(validInput)).resolves.toEqual(
+        validInput
+      );
+
+      const invalidInput = { name: "John", age: 30, email: "a@a.com" };
+      await expect(omittedSchema.parse(invalidInput)).rejects.toThrow();
+    });
+
+    it("should not affect the original schema", async () => {
+      baseSchema.omit(["email"]);
       await expect(
-        (pickedSchema as any).parse({ name: "test" })
+        baseSchema.parse({ name: "John", age: 30, email: "a@a.com" })
+      ).resolves.toBeTruthy();
+    });
+
+    it("should still enforce types for remaining properties", async () => {
+      const omittedSchema = baseSchema.omit(["email"]);
+      await expect(
+        // @ts-expect-error - Testing runtime validation by passing a string where a number is expected.
+        omittedSchema.parse({ name: "John", age: "30" })
+      ).rejects.toThrow();
+    });
+
+    it("should handle omitting non-existent keys gracefully", async () => {
+      // @ts-expect-error - Testing omitting a key that does not exist.
+      const omittedSchema = baseSchema.omit(["nonexistent"]);
+      const validInput = { name: "John", age: 30, email: "a@a.com" };
+      await expect(omittedSchema.parse(validInput)).resolves.toEqual(
+        validInput
+      );
+    });
+  });
+
+  describe("extend", () => {
+    const baseSchema = s.object({
+      properties: {
+        name: s.string(),
+      },
+    });
+
+    it("should add new properties to the schema", async () => {
+      const extendedSchema = baseSchema.extend({
+        age: s.number(),
+      });
+      const data = { name: "John", age: 30 };
+      await expect(extendedSchema.parse(data)).resolves.toEqual(data);
+    });
+
+    it("should overwrite existing properties", async () => {
+      const extendedSchema = baseSchema.extend({
+        name: s.number(), // Overwriting string with number
+      });
+      const data = { name: 123 };
+      await expect(extendedSchema.parse(data)).resolves.toEqual(data);
+    });
+
+    it("should not affect the original schema", async () => {
+      baseSchema.extend({ age: s.number() });
+      // original schema should still pass with just a name
+      await expect(baseSchema.parse({ name: "test" })).resolves.toEqual({
+        name: "test",
+      });
+      // original schema should ignore extra properties because it is not strict
+      await expect(
+        baseSchema.parse({ name: "John", age: 30 })
+      ).resolves.toEqual({ name: "John", age: 30 });
+    });
+
+    it("should correctly validate the extended schema", async () => {
+      const extendedSchema = baseSchema.extend({
+        age: s.number(),
+      });
+      // Missing 'age'
+      await expect(extendedSchema.parse({ name: "John" })).rejects.toThrow();
+      // Incorrect type for 'age'
+      await expect(
+        // @ts-expect-error - Testing runtime validation by passing a string where a number is expected.
+        extendedSchema.parse({ name: "John", age: "30" })
       ).rejects.toThrow();
     });
   });

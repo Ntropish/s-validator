@@ -25,19 +25,19 @@ describe("Switch Validator", () => {
       );
 
       const userEvent = {
-        type: "USER_CREATED",
+        type: "USER_CREATED" as const,
         userId: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
       };
       await expect(eventSchema.parse(userEvent)).resolves.toEqual(userEvent);
 
       const orderEvent = {
-        type: "ORDER_PLACED",
+        type: "ORDER_PLACED" as const,
         orderId: "caaaaaaaaaaaaaaaaaaaaaaaa",
         amount: 100,
       };
       await expect(eventSchema.parse(orderEvent)).resolves.toEqual(orderEvent);
 
-      const invalidEvent = { type: "INVALID_EVENT" };
+      const invalidEvent = { type: "INVALID_EVENT" as const };
       await expect(eventSchema.parse(invalidEvent)).resolves.toEqual(
         invalidEvent
       ); // No default, so it passes
