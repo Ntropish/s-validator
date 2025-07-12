@@ -12,9 +12,20 @@ export const objectValidatorMap = {
     properties: async (
       value: object,
       [properties]: [Record<string, SchemaLike>],
-      context
+      context,
+      schema
     ) => {
       if (typeof value !== "object" || value === null) return false;
+
+      if (schema.config.strict) {
+        const schemaKeys = Object.keys(properties);
+        const valueKeys = Object.keys(value);
+        for (const key of valueKeys) {
+          if (!schemaKeys.includes(key)) {
+            return false; // Found a key not in the schema
+          }
+        }
+      }
 
       for (const key in properties) {
         const schema: SchemaLike = properties[key];

@@ -180,7 +180,8 @@ export class Schema<T> implements StandardSchemaV1<T, T> {
       const result = await identityValidator.validator(
         context.value,
         identityValidator.args,
-        context
+        context,
+        this
       );
       if (!result) {
         const path = context.path.join(".");
@@ -204,7 +205,7 @@ export class Schema<T> implements StandardSchemaV1<T, T> {
 
     for (const { name, validator, args } of this.validators) {
       if (name === "identity") continue;
-      const result = await validator(context.value, args, context);
+      const result = await validator(context.value, args, context, this);
       if (!result) {
         const path = context.path.join(".");
         const messages = this.config.messages as
@@ -234,6 +235,70 @@ export class Schema<T> implements StandardSchemaV1<T, T> {
     }
 
     return context.value;
+  }
+
+  public partial(): Schema<Partial<T>> {
+    if (this.dataType !== "object" || !this.config.properties) {
+      return this as any; // Or throw an error
+    }
+
+    const originalProperties = this.config.properties as Record<
+      string,
+      Schema<any>
+    >;
+    const newProperties: Record<string, Schema<any>> = {};
+
+    for (const key in originalProperties) {
+      newProperties[key] = originalProperties[key].optional();
+    }
+
+    const newConfig = { ...this.config, properties: newProperties };
+
+    return new Schema(this.dataType, newConfig, validatorMap);
+  }
+
+  public pick<K extends keyof T>(keys: K[]): Schema<Pick<T, K>> {
+    if (this.dataType !== "object" || !this.config.properties) {
+      // In a real-world scenario, you might want to throw an error
+      // or handle this more gracefully. For now, we'll return `this`
+      // which is not ideal but prevents a runtime crash.
+      return this as any;
+    }
+
+    const originalProperties = this.config.properties as Record<
+      string,
+      Schema<any>
+    >;
+    const newProperties: Record<string, Schema<any>> = {};
+
+    for (const key of keys) {
+      if (originalProperties[key as string]) {
+        newProperties[key as string] = originalProperties[key as string];
+      }
+    }
+
+    const newConfig = {
+      ...this.config,
+      properties: newProperties,
+      strict: true,
+    };
+    return new Schema(this.dataType, newConfig, validatorMap);
+  }
+
+  public optional(): Schema<T | undefined> {
+    return new Schema(
+      this.dataType,
+      { ...this.config, optional: true },
+      validatorMap
+    );
+  }
+
+  public nullable(): Schema<T | null> {
+    return new Schema(
+      this.dataType,
+      { ...this.config, nullable: true },
+      validatorMap
+    );
   }
 }
 

@@ -21,7 +21,8 @@ export type ValidationContext = {
 export type ValidatorFunction<T = any, Args extends any[] = any[]> = (
   value: T,
   args: Args,
-  context: ValidationContext
+  context: ValidationContext,
+  schema: Schema<T>
 ) => boolean | Promise<boolean>;
 
 // A collection of validators for a specific data type.
