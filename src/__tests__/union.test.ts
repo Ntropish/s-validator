@@ -15,8 +15,8 @@ describe("Union Validator", () => {
   });
 
   it("should pass with more complex schemas", async () => {
-    const stringSchema = s.string({ minLength: 5 });
-    const numberSchema = s.number({ min: 100 });
+    const stringSchema = s.string({ validate: { minLength: 5 } });
+    const numberSchema = s.number({ validate: { min: 100 } });
     const schema = s.union([stringSchema, numberSchema]);
 
     await expect(schema.parse("long enough")).resolves.toBe("long enough");
@@ -24,8 +24,8 @@ describe("Union Validator", () => {
   });
 
   it("should throw with more complex schemas if validation fails", async () => {
-    const stringSchema = s.string({ minLength: 6 });
-    const numberSchema = s.number({ min: 100 });
+    const stringSchema = s.string({ validate: { minLength: 6 } });
+    const numberSchema = s.number({ validate: { min: 100 } });
     const schema = s.union([stringSchema, numberSchema]);
 
     const result = await schema.safeParse("short");
@@ -37,10 +37,16 @@ describe("Union Validator", () => {
 
   it("should work with object schemas", async () => {
     const schemaA = s.object({
-      properties: { type: s.string({ oneOf: ["a"] }), a: s.string() },
+      properties: {
+        type: s.string({ validate: { oneOf: ["a"] } }),
+        a: s.string(),
+      },
     });
     const schemaB = s.object({
-      properties: { type: s.string({ oneOf: ["b"] }), b: s.number() },
+      properties: {
+        type: s.string({ validate: { oneOf: ["b"] } }),
+        b: s.number(),
+      },
     });
     const schema = s.union([schemaA, schemaB]);
     const dataA = { type: "a", a: "hello" };

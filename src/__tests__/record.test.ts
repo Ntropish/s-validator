@@ -23,7 +23,7 @@ describe("Record Validator", () => {
 
   it("should fail if a key does not match the key schema", async () => {
     // Keys must be UUIDs
-    const schema = s.record(s.string({ uuid: true }), s.any());
+    const schema = s.record(s.string({ validate: { uuid: true } }), s.any());
     const data = {
       "f47ac10b-58cc-4372-a567-0e02b2c3d479": "valid",
       "not-a-uuid": "invalid",
@@ -59,10 +59,10 @@ describe("Record Validator", () => {
     const userSchema = s.object({
       properties: {
         name: s.string(),
-        email: s.string({ email: true }),
+        email: s.string({ validate: { email: true } }),
       },
     });
-    const schema = s.record(s.string({ uuid: true }), userSchema);
+    const schema = s.record(s.string({ validate: { uuid: true } }), userSchema);
     const data = {
       "f47ac10b-58cc-4372-a567-0e02b2c3d479": {
         name: "John Doe",
@@ -80,10 +80,10 @@ describe("Record Validator", () => {
     const userSchema = s.object({
       properties: {
         name: s.string(),
-        email: s.string({ email: true }),
+        email: s.string({ validate: { email: true } }),
       },
     });
-    const schema = s.record(s.string({ uuid: true }), userSchema);
+    const schema = s.record(s.string({ validate: { uuid: true } }), userSchema);
     const data = {
       "f47ac10b-58cc-4372-a567-0e02b2c3d479": {
         name: "John Doe",

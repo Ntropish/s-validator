@@ -1,11 +1,11 @@
 import { Intersect, UnionToIntersection } from "./utils.js";
-import { arrayValidatorMap } from "./validators/array.js";
+import { arrayValidators } from "./validators/array.js";
 import {
   booleanValidatorMap,
   booleanPreparations,
 } from "./validators/boolean.js";
 import { numberValidatorMap, numberPreparations } from "./validators/number.js";
-import { objectValidatorMap } from "./validators/object.js";
+import { objectValidators } from "./validators/object.js";
 import {
   stringValidatorMap,
   stringPreparations,
@@ -21,6 +21,9 @@ import { neverValidatorMap } from "./validators/never.js";
 import { mapValidatorMap } from "./validators/map.js";
 import { setValidatorMap } from "./validators/set.js";
 import { instanceofValidatorMap } from "./validators/instanceof.js";
+
+const arrayValidatorMap = { array: arrayValidators };
+const objectValidatorMap = { object: objectValidators };
 
 type ValidatorMapUnion =
   | typeof stringValidatorMap

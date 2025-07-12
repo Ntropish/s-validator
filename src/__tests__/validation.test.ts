@@ -5,8 +5,7 @@ import { ValidationError } from "../validators/types.js";
 describe("Validation", () => {
   it("should validate a string", async () => {
     const schema = s.string({
-      minLength: 3,
-      maxLength: 10,
+      validate: { minLength: 3, maxLength: 10 },
     });
     await expect(schema.parse("hello")).resolves.toBe("hello");
     await expect(schema.parse("hi")).rejects.toThrow(ValidationError);
@@ -18,8 +17,8 @@ describe("Validation", () => {
   it("should validate an object", async () => {
     const schema = s.object({
       properties: {
-        name: s.string({ minLength: 2 }),
-        age: s.number({ min: 18 }),
+        name: s.string({ validate: { minLength: 2 } }),
+        age: s.number({ validate: { min: 18 } }),
       },
     });
     await expect(schema.parse({ name: "John Doe", age: 30 })).resolves.toEqual({

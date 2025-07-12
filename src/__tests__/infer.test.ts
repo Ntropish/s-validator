@@ -31,7 +31,7 @@ describe("s.infer", () => {
     const objectData: ObjectType = { name: "test", age: 30 };
     expect(typeof objectData).toBe("object");
 
-    const arraySchema = s.array({ ofType: s.string() });
+    const arraySchema = s.array({ validate: { ofType: s.string() } });
     type ArrayType = s.infer<typeof arraySchema>;
     const arrayData: ArrayType = ["a", "b"];
     expect(Array.isArray(arrayData)).toBe(true);

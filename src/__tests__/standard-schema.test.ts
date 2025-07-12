@@ -11,7 +11,7 @@ describe("Standard Schema", () => {
   });
 
   it("should validate successfully via the standard interface", async () => {
-    const schema = s.string({ minLength: 3 });
+    const schema = s.string({ validate: { minLength: 3 } });
     const result = await schema["~standard"].validate("hello");
     if ("value" in result) {
       expect(result.issues).toBeUndefined();
@@ -38,7 +38,7 @@ describe("Standard Schema", () => {
       properties: {
         user: s.object({
           properties: {
-            name: s.string({ minLength: 10 }),
+            name: s.string({ validate: { minLength: 10 } }),
           },
         }),
       },

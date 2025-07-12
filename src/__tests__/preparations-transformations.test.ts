@@ -5,7 +5,7 @@ describe("Preparations and Transformations", () => {
   describe("string preparations", () => {
     it("should coerce a number to a string", async () => {
       const schema = s.string({
-        preparations: {
+        prepare: {
           coerce: true,
         },
       });
@@ -21,7 +21,7 @@ describe("Preparations and Transformations", () => {
   describe("string transformations", () => {
     it("should transform to uppercase", async () => {
       const schema = s.string({
-        transformations: {
+        transform: {
           toUpperCase: true,
         },
       });
@@ -30,7 +30,7 @@ describe("Preparations and Transformations", () => {
 
     it("should transform to lowercase", async () => {
       const schema = s.string({
-        transformations: {
+        transform: {
           toLowerCase: true,
         },
       });
@@ -39,7 +39,7 @@ describe("Preparations and Transformations", () => {
 
     it("should trim whitespace", async () => {
       const schema = s.string({
-        transformations: {
+        transform: {
           trim: true,
         },
       });
@@ -48,7 +48,7 @@ describe("Preparations and Transformations", () => {
 
     it("should chain transformations in order", async () => {
       const schema = s.string({
-        transformations: {
+        transform: {
           trim: true,
           toUpperCase: true,
         },

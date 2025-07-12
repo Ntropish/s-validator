@@ -16,19 +16,19 @@ describe("Boolean Validator", () => {
 
   describe("coerce", () => {
     it("should coerce a truthy value to true", async () => {
-      const schema = s.boolean({ preparations: { coerce: true } });
+      const schema = s.boolean({ prepare: { coerce: true } });
       await expect(schema.parse("hello" as any)).resolves.toBe(true);
       await expect(schema.parse(1 as any)).resolves.toBe(true);
     });
 
     it("should coerce a falsy value to false", async () => {
-      const schema = s.boolean({ preparations: { coerce: true } });
+      const schema = s.boolean({ prepare: { coerce: true } });
       await expect(schema.parse("" as any)).resolves.toBe(false);
       await expect(schema.parse(0 as any)).resolves.toBe(false);
     });
 
     it("should not coerce when disabled", async () => {
-      const schema = s.boolean({ preparations: { coerce: false } });
+      const schema = s.boolean({ prepare: { coerce: false } });
       await expect(schema.parse("true" as any)).rejects.toThrow(
         ValidationError
       );
@@ -39,7 +39,7 @@ describe("Boolean Validator", () => {
     const truthy = ["true", "1", "yes", "on", "y", "enabled"];
     truthy.forEach((value) => {
       it(`should coerce '${value}' to true`, async () => {
-        const schema = s.boolean({ preparations: { stringBool: true } });
+        const schema = s.boolean({ prepare: { stringBool: true } });
         await expect(schema.parse(value)).resolves.toBe(true);
       });
     });
@@ -47,13 +47,13 @@ describe("Boolean Validator", () => {
     const falsy = ["false", "0", "no", "off", "n", "disabled"];
     falsy.forEach((value) => {
       it(`should coerce '${value}' to false`, async () => {
-        const schema = s.boolean({ preparations: { stringBool: true } });
+        const schema = s.boolean({ prepare: { stringBool: true } });
         await expect(schema.parse(value)).resolves.toBe(false);
       });
     });
 
     it("should not coerce an invalid string", async () => {
-      const schema = s.boolean({ preparations: { stringBool: true } });
+      const schema = s.boolean({ prepare: { stringBool: true } });
       await expect(schema.parse("tru")).rejects.toThrow(ValidationError);
     });
   });

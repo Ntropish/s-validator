@@ -1,15 +1,16 @@
 import { describe, it, expect } from "vitest";
 import { s } from "../index.js";
+import { ValidationError } from "../validators/types.js";
 
 describe("Object Modifiers", () => {
-  describe("partial", () => {
-    const baseSchema = s.object({
-      properties: {
-        name: s.string(),
-        age: s.number(),
-      },
-    });
+  const baseSchema = s.object({
+    properties: {
+      name: s.string({ validate: { minLength: 1 } }),
+      age: s.number(),
+    },
+  });
 
+  describe("partial", () => {
     it("should make all properties optional", async () => {
       const partialSchema = baseSchema.partial();
 
@@ -49,7 +50,7 @@ describe("Object Modifiers", () => {
       properties: {
         name: s.string(),
         age: s.number(),
-        email: s.string({ email: true }),
+        email: s.string({ validate: { email: true } }),
       },
     });
 
@@ -91,7 +92,7 @@ describe("Object Modifiers", () => {
       properties: {
         name: s.string(),
         age: s.number(),
-        email: s.string({ email: true }),
+        email: s.string({ validate: { email: true } }),
       },
     });
 

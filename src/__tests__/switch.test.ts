@@ -10,14 +10,14 @@ describe("Switch Validator", () => {
         {
           USER_CREATED: s.object({
             properties: {
-              type: s.string({ oneOf: ["USER_CREATED"] }),
-              userId: s.string({ uuid: true }),
+              type: s.string({ validate: { oneOf: ["USER_CREATED"] } }),
+              userId: s.string({ validate: { uuid: true } }),
             },
           }),
           ORDER_PLACED: s.object({
             properties: {
-              type: s.string({ oneOf: ["ORDER_PLACED"] }),
-              orderId: s.string({ cuid: true }),
+              type: s.string({ validate: { oneOf: ["ORDER_PLACED"] } }),
+              orderId: s.string({ validate: { cuid: true } }),
               amount: s.number(),
             },
           }),
@@ -57,9 +57,9 @@ describe("Switch Validator", () => {
       const schema = s.switch(
         (c) => c.value.key,
         {
-          a: s.string({ minLength: 100 }),
+          a: s.string({ validate: { minLength: 100 } }),
         },
-        s.string({ maxLength: 5 })
+        s.string({ validate: { maxLength: 5 } })
       );
 
       await expect(schema.parse("short")).resolves.toBe("short");
@@ -70,9 +70,9 @@ describe("Switch Validator", () => {
       const schema = s.switch(
         (c) => c.value.missingKey, // this will be undefined
         {
-          a: s.string({ minLength: 100 }),
+          a: s.string({ validate: { minLength: 100 } }),
         },
-        s.string({ maxLength: 5 })
+        s.string({ validate: { maxLength: 5 } })
       );
       await expect(schema.parse("short" as any)).resolves.toBe("short");
     });
@@ -82,7 +82,7 @@ describe("Switch Validator", () => {
       const schema = s.switch(
         () => "a", // always match 'a'
         {
-          a: s.string({ minLength: 3 }),
+          a: s.string({ validate: { minLength: 3 } }),
         } as any // Cast to any to allow for the unused 'b' case for testing purposes
       );
       await expect(schema.parse("long")).resolves.toBe("long");
@@ -93,8 +93,8 @@ describe("Switch Validator", () => {
       const nestedSchema: Schema<any> = s.switch(
         (c) => (c.rootData as any).nestedKey, // check nestedKey on the root object
         {
-          x: s.number({ min: 10 }),
-          y: s.string({ minLength: 10 }),
+          x: s.number({ validate: { min: 10 } }),
+          y: s.string({ validate: { minLength: 10 } }),
         },
         s.any()
       );

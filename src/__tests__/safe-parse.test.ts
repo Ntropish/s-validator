@@ -4,7 +4,7 @@ import { ValidationError } from "../validators/types.js";
 
 describe("safeParse", () => {
   it("should return a success result for valid data", async () => {
-    const schema = s.string({ minLength: 3 });
+    const schema = s.string({ validate: { minLength: 3 } });
     const result = await schema.safeParse("hello");
     if (result.status === "success") {
       expect(result.data).toBe("hello");
@@ -14,7 +14,7 @@ describe("safeParse", () => {
   });
 
   it("should return a failure result for invalid data", async () => {
-    const schema = s.string({ minLength: 5 });
+    const schema = s.string({ validate: { minLength: 5 } });
     const result = await schema.safeParse("hi");
 
     if (result.status === "error") {
@@ -27,7 +27,9 @@ describe("safeParse", () => {
   });
 
   it("should collect multiple errors", async () => {
-    const schema = s.string({ minLength: 10, pattern: /^[a-zA-Z]+$/ });
+    const schema = s.string({
+      validate: { minLength: 10, pattern: /^[a-zA-Z]+$/ },
+    });
     const result = await schema.safeParse("123");
     if (result.status === "error") {
       expect(result.error).toBeInstanceOf(ValidationError);
@@ -53,7 +55,7 @@ describe("safeParse", () => {
   });
 
   it("should still throw from .parse()", async () => {
-    const schema = s.string({ minLength: 5 });
+    const schema = s.string({ validate: { minLength: 5 } });
     await expect(schema.parse("hi")).rejects.toThrow(ValidationError);
   });
 });

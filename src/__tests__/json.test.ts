@@ -5,12 +5,14 @@ import { ValidationError } from "../validators/types.js";
 describe("json validator", () => {
   it("should validate a string containing JSON that matches the schema", async () => {
     const schema = s.string({
-      json: s.object({
-        properties: {
-          name: s.string(),
-          age: s.number(),
-        },
-      }),
+      validate: {
+        json: s.object({
+          properties: {
+            name: s.string(),
+            age: s.number(),
+          },
+        }),
+      },
     });
 
     const data = JSON.stringify({ name: "John Doe", age: 30 });
@@ -19,12 +21,14 @@ describe("json validator", () => {
 
   it("should throw an error for a string containing JSON that does not match the schema", async () => {
     const schema = s.string({
-      json: s.object({
-        properties: {
-          name: s.string(),
-          age: s.number(),
-        },
-      }),
+      validate: {
+        json: s.object({
+          properties: {
+            name: s.string(),
+            age: s.number(),
+          },
+        }),
+      },
     });
 
     const data = JSON.stringify({ name: "John Doe", age: "30" }); // age is a string
@@ -33,11 +37,13 @@ describe("json validator", () => {
 
   it("should throw an error for a string that is not valid JSON", async () => {
     const schema = s.string({
-      json: s.object({
-        properties: {
-          name: s.string(),
-        },
-      }),
+      validate: {
+        json: s.object({
+          properties: {
+            name: s.string(),
+          },
+        }),
+      },
     });
 
     const data = "not a json string";
@@ -46,11 +52,13 @@ describe("json validator", () => {
 
   it("should throw an error if the value is not a string", async () => {
     const schema = s.string({
-      json: s.object({
-        properties: {
-          name: s.string(),
-        },
-      }),
+      validate: {
+        json: s.object({
+          properties: {
+            name: s.string(),
+          },
+        }),
+      },
     });
 
     const data = 123;
@@ -59,20 +67,22 @@ describe("json validator", () => {
 
   it("should handle nested JSON schemas", async () => {
     const schema = s.string({
-      json: s.object({
-        properties: {
-          user: s.object({
-            properties: {
-              name: s.string(),
-              details: s.object({
-                properties: {
-                  tags: s.array({ ofType: s.string() }),
-                },
-              }),
-            },
-          }),
-        },
-      }),
+      validate: {
+        json: s.object({
+          properties: {
+            user: s.object({
+              properties: {
+                name: s.string(),
+                details: s.object({
+                  properties: {
+                    tags: s.array({ validate: { ofType: s.string() } }),
+                  },
+                }),
+              },
+            }),
+          },
+        }),
+      },
     });
 
     const validData = JSON.stringify({

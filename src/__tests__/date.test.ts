@@ -18,7 +18,7 @@ describe("Date Validator", () => {
   describe("min", () => {
     it("should pass if the date is after the minimum", async () => {
       const minDate = new Date("2023-01-01");
-      const schema = s.date({ min: minDate });
+      const schema = s.date({ validate: { min: minDate } });
       await expect(
         schema.parse(new Date("2023-01-02"))
       ).resolves.toBeInstanceOf(Date);
@@ -26,7 +26,7 @@ describe("Date Validator", () => {
 
     it("should throw if the date is before the minimum", async () => {
       const minDate = new Date("2023-01-01");
-      const schema = s.date({ min: minDate });
+      const schema = s.date({ validate: { min: minDate } });
       await expect(schema.parse(new Date("2022-12-31"))).rejects.toThrow(
         ValidationError
       );
@@ -36,7 +36,7 @@ describe("Date Validator", () => {
   describe("max", () => {
     it("should pass if the date is before the maximum", async () => {
       const maxDate = new Date("2023-01-01");
-      const schema = s.date({ max: maxDate });
+      const schema = s.date({ validate: { max: maxDate } });
       await expect(
         schema.parse(new Date("2022-12-31"))
       ).resolves.toBeInstanceOf(Date);
@@ -44,7 +44,7 @@ describe("Date Validator", () => {
 
     it("should throw if the date is after the maximum", async () => {
       const maxDate = new Date("2023-01-01");
-      const schema = s.date({ max: maxDate });
+      const schema = s.date({ validate: { max: maxDate } });
       await expect(schema.parse(new Date("2023-01-02"))).rejects.toThrow(
         ValidationError
       );
@@ -53,19 +53,25 @@ describe("Date Validator", () => {
 
   describe("coerce", () => {
     it("should coerce a string to a Date object", async () => {
-      const schema = s.date({ preparations: { coerce: true } });
-      await expect(schema.parse("2023-01-01")).resolves.toBeInstanceOf(Date);
+      const schema = s.date({ prepare: { coerce: true } });
+      await expect(schema.parse("2023-01-01" as any)).resolves.toBeInstanceOf(
+        Date
+      );
     });
 
     it("should coerce a number to a Date object", async () => {
-      const schema = s.date({ preparations: { coerce: true } });
+      const schema = s.date({ prepare: { coerce: true } });
       const timestamp = new Date("2023-01-01").getTime();
-      await expect(schema.parse(timestamp)).resolves.toBeInstanceOf(Date);
+      await expect(schema.parse(timestamp as any)).resolves.toBeInstanceOf(
+        Date
+      );
     });
 
     it("should not coerce when disabled", async () => {
-      const schema = s.date({ preparations: { coerce: false } });
-      await expect(schema.parse("2023-01-01")).rejects.toThrow(ValidationError);
+      const schema = s.date({ prepare: { coerce: false } });
+      await expect(schema.parse("2023-01-01" as any)).rejects.toThrow(
+        ValidationError
+      );
     });
   });
 });

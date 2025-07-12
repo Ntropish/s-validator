@@ -41,30 +41,36 @@ type InferConfig<Func> = Func extends (
   ? ConfigType
   : unknown;
 
+type CustomValidator<T> =
+  | ((value: T, context: ValidationContext) => boolean | Promise<boolean>)
+  | {
+      validator: (
+        value: T,
+        context: ValidationContext
+      ) => boolean | Promise<boolean>;
+      message?: string;
+    };
+
 // Creates a typed config object from a validator collection.
-type ValidatorConfig<VCollection> = Prettify<
-  {
-    [K in keyof Omit<
-      VCollection,
-      "identity" | "preparations" | "transformations" | "messages"
-    >]?: InferConfig<VCollection[K]>;
-  } & {
-    preparations?: Record<string, any>;
-    transformations?: Record<string, any>;
-    optional?: boolean;
-    nullable?: boolean;
-    messages?: Prettify<
-      {
-        [K in keyof Omit<
-          VCollection,
-          "identity" | "messages" | "preparations" | "transformations"
-        >]?: string;
-      } & {
-        identity?: string;
-      }
-    >;
-  }
->;
+type ValidatorConfig<VCollection> = {
+  optional?: boolean;
+  nullable?: boolean;
+  messages?: Prettify<
+    {
+      [K in keyof Omit<
+        VCollection,
+        "identity" | "messages" | "preparations" | "transformations"
+      >]?: string;
+    } & {
+      identity?: string;
+    }
+  >;
+  prepare?: Record<string, any> & { custom?: ((value: any) => any)[] };
+  validate?: Record<string, any> & {
+    custom?: CustomValidator<any> | CustomValidator<any>[];
+  };
+  transform?: Record<string, any> & { custom?: ((value: any) => any)[] };
+};
 
 // Infers the base data type (e.g., string, number) from the identity validator.
 type InferDataType<VCollection> = VCollection extends {
@@ -108,21 +114,24 @@ function isValidationContext(thing: any): thing is ValidationContext {
 export class Schema<TOutput, TInput = TOutput>
   implements StandardSchemaV1<TInput, TOutput>
 {
-  private validators: Array<{
+  protected validators: Array<{
     name: string;
     validator: ValidatorFunction<TOutput>;
     args: any[];
   }> = [];
-  private preparations: Array<{
+  protected preparations: Array<{
     name: string;
     preparation: PreparationFunction;
     args: any[];
   }> = [];
-  private transformations: Array<{
+  protected customPreparations: PreparationFunction[] = [];
+  protected transformations: Array<{
     name: string;
     transformation: TransformationFunction;
     args: any[];
   }> = [];
+  protected customTransformations: TransformationFunction[] = [];
+  protected customValidators: CustomValidator<TOutput>[] = [];
   private dataType: string;
   public config: Record<string, unknown>;
   public readonly "~standard": StandardSchemaV1.Props<TInput, TOutput>;
@@ -139,6 +148,7 @@ export class Schema<TOutput, TInput = TOutput>
     const validatorCollection = validatorMap[dataType];
     const preparationCollection = preparationMap[dataType];
     const transformationCollection = transformationMap[dataType];
+    const { prepare, validate, transform } = config as ValidatorConfig<any>;
 
     if (validatorCollection?.identity) {
       this.validators.push({
@@ -148,46 +158,50 @@ export class Schema<TOutput, TInput = TOutput>
       });
     }
 
-    for (const [validatorName, validatorConfig] of Object.entries(config)) {
-      if (validatorName === "optional" || validatorName === "nullable") {
-        continue;
-      }
-      const validator = validatorCollection?.[validatorName];
-      if (typeof validator === "function") {
-        const args = [validatorConfig];
-
-        this.validators.push({
-          name: validatorName,
-          validator,
-          args,
-        });
-      }
-    }
-
-    if ("preparations" in config && preparationCollection) {
-      for (const [prepName, prepConfig] of Object.entries(
-        config.preparations as any
-      )) {
-        const preparation = preparationCollection[prepName];
-        if (typeof preparation === "function") {
+    if (prepare) {
+      for (const [prepName, prepConfig] of Object.entries(prepare)) {
+        if (prepName === "custom") {
+          this.customPreparations = prepConfig;
+          continue;
+        }
+        if (preparationCollection?.[prepName]) {
           this.preparations.push({
             name: prepName,
-            preparation,
+            preparation: preparationCollection[prepName],
             args: [prepConfig],
           });
         }
       }
     }
 
-    if ("transformations" in config && transformationCollection) {
-      for (const [transName, transConfig] of Object.entries(
-        config.transformations as any
-      )) {
-        const transformation = transformationCollection[transName];
-        if (typeof transformation === "function") {
+    if (validate) {
+      for (const [valName, valConfig] of Object.entries(validate)) {
+        if (valName === "custom") {
+          this.customValidators = Array.isArray(valConfig)
+            ? valConfig
+            : [valConfig];
+          continue;
+        }
+        if (validatorCollection?.[valName]) {
+          this.validators.push({
+            name: valName,
+            validator: validatorCollection[valName],
+            args: [valConfig],
+          });
+        }
+      }
+    }
+
+    if (transform) {
+      for (const [transName, transConfig] of Object.entries(transform)) {
+        if (transName === "custom") {
+          this.customTransformations = transConfig;
+          continue;
+        }
+        if (transformationCollection?.[transName]) {
           this.transformations.push({
             name: transName,
-            transformation,
+            transformation: transformationCollection[transName],
             args: [transConfig],
           });
         }
@@ -258,75 +272,91 @@ export class Schema<TOutput, TInput = TOutput>
   }
 
   protected async _parse(context: ValidationContext): Promise<TOutput> {
-    let current_value = context.value;
-
+    // Run preparations
+    let current_value: any = context.value;
     for (const { preparation, args } of this.preparations) {
-      current_value = await preparation(current_value, args, context, this);
+      current_value = await preparation(
+        current_value,
+        args,
+        { ...context, value: current_value },
+        this
+      );
+    }
+    for (const customPreparation of this.customPreparations) {
+      current_value = await customPreparation(
+        current_value,
+        [],
+        { ...context, value: current_value },
+        this
+      );
     }
 
+    // Optional/nullable checks
     if (this.config.optional && current_value === undefined) {
-      return current_value as TOutput;
+      return undefined as TOutput;
     }
     if (this.config.nullable && current_value === null) {
-      return current_value as TOutput;
+      return null as TOutput;
     }
 
     const issues: ValidationIssue[] = [];
+    const messages = (this.config as ValidatorConfig<any>).messages ?? {};
 
+    // Identity validation first
     const identityValidator = this.validators.find(
       (v) => v.name === "identity"
     );
-    if (identityValidator) {
-      const result = await identityValidator.validator(
+    if (
+      identityValidator &&
+      !(await identityValidator.validator(
         current_value,
         identityValidator.args,
         context,
         this
-      );
-      if (!result) {
-        const path = context.path.join(".");
-        const messages = this.config.messages as
-          | { [key: string]: string }
-          | undefined;
-        let message = messages?.identity;
+      ))
+    ) {
+      issues.push({
+        path: context.path,
+        message:
+          messages.identity ??
+          `Expected type ${this.dataType}, found ${typeof current_value}`,
+      });
+      // If identity fails, no point in running other validators
+      throw new ValidationError(issues);
+    }
 
-        if (!message) {
-          message = `Invalid type. Expected ${
-            this.dataType
-          }, received ${typeof current_value}. Path: '${path}'`;
-        }
+    // Other validations
+    for (const { name, validator, args } of this.validators) {
+      if (name === "identity") continue;
+      if (!(await validator(current_value, args, context, this))) {
         issues.push({
           path: context.path,
-          message,
+          message:
+            messages[name] ?? `Validation failed for ${this.dataType}.${name}`,
         });
-        throw new ValidationError(issues); // Throw immediately
       }
     }
 
-    for (const { name, validator, args } of this.validators) {
-      if (name === "identity") continue;
-      const result = await validator(current_value, args, context, this);
+    // Custom validations
+    for (const customValidator of this.customValidators) {
+      const result =
+        typeof customValidator === "function"
+          ? await customValidator(current_value, {
+              ...context,
+              value: current_value,
+            })
+          : await customValidator.validator(current_value, {
+              ...context,
+              value: current_value,
+            });
+
       if (!result) {
-        const path = context.path.join(".");
-        const messages = this.config.messages as
-          | { [key: string]: string }
-          | undefined;
-        let message = messages?.[name];
-
-        if (!message) {
-          if (name === "identity") {
-            message = `Invalid type. Expected ${
-              this.dataType
-            }, received ${typeof current_value}. Path: '${path}'`;
-          } else {
-            message = `Validation failed for ${this.dataType}.${name} at path '${path}'`;
-          }
-        }
-
-        issues.push({
-          path: context.path,
-          message,
-        });
+        const message =
+          typeof customValidator === "function"
+            ? `Custom validation failed for ${this.dataType}`
+            : customValidator.message ??
+              `Custom validation failed for ${this.dataType}`;
+        issues.push({ path: context.path, message });
       }
     }
 
@@ -334,11 +364,25 @@ export class Schema<TOutput, TInput = TOutput>
       throw new ValidationError(issues);
     }
 
+    // Run transformations
     for (const { transformation, args } of this.transformations) {
-      current_value = await transformation(current_value, args, context, this);
+      current_value = await transformation(
+        current_value,
+        args,
+        { ...context, value: current_value },
+        this
+      );
+    }
+    for (const customTransformation of this.customTransformations) {
+      current_value = await customTransformation(
+        current_value,
+        [],
+        { ...context, value: current_value },
+        this
+      );
     }
 
-    return current_value as TOutput;
+    return current_value;
   }
 
   public optional(): Schema<TOutput | undefined, TInput | undefined> {
@@ -368,6 +412,150 @@ class ObjectSchema<
 > extends Schema<T> {
   constructor(config: SObjectOptions<P>) {
     super("object", config, validatorMap, preparationMap, transformationMap);
+  }
+
+  protected async _parse(context: ValidationContext): Promise<T> {
+    // Run preparations on the object itself.
+    let current_value: any = context.value;
+    for (const { preparation, args } of this.preparations) {
+      current_value = await preparation(
+        current_value,
+        args,
+        { ...context, value: current_value },
+        this
+      );
+    }
+    for (const customPreparation of this.customPreparations) {
+      current_value = await customPreparation(
+        current_value,
+        [],
+        { ...context, value: current_value },
+        this
+      );
+    }
+
+    // Optional/nullable checks
+    if (this.config.optional && current_value === undefined) {
+      return undefined as T;
+    }
+    if (this.config.nullable && current_value === null) {
+      return null as T;
+    }
+
+    // Identity check
+    if (
+      typeof current_value !== "object" ||
+      current_value === null ||
+      Array.isArray(current_value)
+    ) {
+      throw new ValidationError([
+        {
+          path: context.path,
+          message: `Invalid type. Expected object, received ${typeof current_value}.`,
+        },
+      ]);
+    }
+
+    // Property-level parsing
+    const properties = (this.config as SObjectOptions<P>).properties;
+    const isStrict = (this.config as SObjectOptions<P>).strict;
+    const newObject: Record<string, any> = {};
+    const issues: ValidationIssue[] = [];
+
+    const allKeys = new Set([
+      ...Object.keys(current_value),
+      ...Object.keys(properties),
+    ]);
+
+    for (const key of allKeys) {
+      const schema = properties[key];
+      const valueExists = Object.prototype.hasOwnProperty.call(
+        current_value,
+        key
+      );
+
+      if (schema) {
+        try {
+          const parsedValue = await schema.parse({
+            ...context,
+            path: [...context.path, key],
+            value: current_value[key],
+          });
+          if (parsedValue !== undefined) {
+            newObject[key] = parsedValue;
+          }
+        } catch (e) {
+          if (e instanceof ValidationError) {
+            issues.push(...e.issues);
+          } else {
+            throw e;
+          }
+        }
+      } else if (valueExists) {
+        if (isStrict) {
+          issues.push({
+            path: [...context.path, key],
+            message: `Unrecognized key: '${key}'`,
+          });
+        } else {
+          newObject[key] = current_value[key];
+        }
+      }
+    }
+
+    if (issues.length > 0) {
+      throw new ValidationError(issues);
+    }
+
+    let finalValue = newObject;
+
+    // Object-level custom validation
+    for (const customValidator of this.customValidators) {
+      const result =
+        typeof customValidator === "function"
+          ? await customValidator(finalValue as any, {
+              ...context,
+              value: finalValue as any,
+            })
+          : await customValidator.validator(finalValue as any, {
+              ...context,
+              value: finalValue as any,
+            });
+      if (!result) {
+        const message =
+          typeof customValidator === "object"
+            ? customValidator.message
+            : "Custom validation failed";
+        issues.push({
+          path: context.path,
+          message: message || "Custom validation failed",
+        });
+      }
+    }
+
+    if (issues.length > 0) {
+      throw new ValidationError(issues);
+    }
+
+    // Object-level transformations
+    for (const { transformation, args } of this.transformations) {
+      finalValue = await transformation(
+        finalValue,
+        args,
+        { ...context, value: finalValue as any },
+        this
+      );
+    }
+    for (const customTransformation of this.customTransformations) {
+      finalValue = await customTransformation(
+        finalValue,
+        [],
+        { ...context, value: finalValue as any },
+        this
+      );
+    }
+
+    return finalValue as T;
   }
 
   public partial(): ObjectSchema<P> {
@@ -445,6 +633,174 @@ class ObjectSchema<
   }
 }
 
+class ArraySchema<T extends Schema<any, any>> extends Schema<
+  Array<s.infer<T>>
+> {
+  private itemSchema: T;
+
+  constructor(config: ValidatorConfig<any> & { validate: { ofType?: T } }) {
+    super("array", config, validatorMap, preparationMap, transformationMap);
+    const { validate } = config as { validate?: { ofType?: T } };
+    if (!validate || !validate.ofType) {
+      // This should not happen with proper static typing, but as a safeguard:
+      throw new Error(
+        "s.array() requires an 'ofType' validator configuration."
+      );
+    }
+    this.itemSchema = validate.ofType;
+  }
+
+  protected async _parse(
+    context: ValidationContext
+  ): Promise<Array<s.infer<T>>> {
+    let current_value: any = context.value;
+
+    // Run array-level preparations
+    for (const { preparation, args } of this.preparations) {
+      current_value = await preparation(
+        current_value,
+        args,
+        { ...context, value: current_value },
+        this
+      );
+    }
+    for (const customPreparation of this.customPreparations) {
+      current_value = await customPreparation(
+        current_value,
+        [],
+        { ...context, value: current_value },
+        this
+      );
+    }
+
+    if (this.config.optional && current_value === undefined) {
+      return undefined as any;
+    }
+    if (this.config.nullable && current_value === null) {
+      return null as any;
+    }
+
+    if (!Array.isArray(current_value)) {
+      throw new ValidationError([
+        {
+          path: context.path,
+          message: `Invalid type. Expected array, received ${typeof current_value}.`,
+        },
+      ]);
+    }
+
+    // Item-level parsing and validation
+    const newArray: any[] = [];
+    const issues: ValidationIssue[] = [];
+    for (let i = 0; i < current_value.length; i++) {
+      try {
+        const parsedValue = await this.itemSchema.parse({
+          ...context,
+          path: [...context.path, i],
+          value: current_value[i],
+        });
+        newArray.push(parsedValue);
+      } catch (e) {
+        if (e instanceof ValidationError) {
+          issues.push(...e.issues);
+        } else {
+          throw e;
+        }
+      }
+    }
+
+    if (issues.length > 0) {
+      throw new ValidationError(issues);
+    }
+
+    let finalValue: any = newArray;
+
+    // Handle tuple validation if 'items' is present
+    const tupleSchemas = this.validators.find((v) => v.name === "items")
+      ?.args[0] as Schema<any, any>[] | undefined;
+
+    if (tupleSchemas) {
+      if (current_value.length !== tupleSchemas.length) {
+        issues.push({
+          path: context.path,
+          message: `Expected a tuple of length ${tupleSchemas.length}, but received ${current_value.length}.`,
+        });
+      } else {
+        for (let i = 0; i < tupleSchemas.length; i++) {
+          const itemSchema = tupleSchemas[i];
+          const item = current_value[i];
+          try {
+            const parsedItem = await itemSchema.parse({
+              ...context,
+              path: [...context.path, i],
+              value: item,
+            });
+            finalValue[i] = parsedItem; // Overwrite the value from the 'ofType' pass
+          } catch (error) {
+            if (error instanceof ValidationError) {
+              issues.push(...error.issues);
+            } else {
+              issues.push({
+                path: [...context.path, i],
+                message: "Invalid tuple item",
+              });
+            }
+          }
+        }
+      }
+    }
+
+    if (issues.length > 0) {
+      throw new ValidationError(issues);
+    }
+
+    // Run array-level validators (length, etc.)
+    for (const { name, validator, args } of this.validators) {
+      if (name === "identity" || name === "ofType") continue;
+      const result = await validator(
+        finalValue,
+        args,
+        { ...context, value: finalValue },
+        this
+      );
+      if (!result) {
+        const path = context.path.join(".");
+        const messages = this.config.messages as
+          | { [key: string]: string }
+          | undefined;
+        let message = messages?.[name];
+        if (!message) {
+          message = `Validation failed for array.${name} at path '${path}'`;
+        }
+        issues.push({ path: context.path, message });
+      }
+    }
+    if (issues.length > 0) {
+      throw new ValidationError(issues);
+    }
+
+    // Array-level transformations
+    for (const { transformation, args } of this.transformations) {
+      finalValue = await transformation(
+        finalValue,
+        args,
+        { ...context, value: finalValue },
+        this
+      );
+    }
+    for (const customTransformation of this.customTransformations) {
+      finalValue = await customTransformation(
+        finalValue,
+        [],
+        { ...context, value: finalValue },
+        this
+      );
+    }
+
+    return finalValue;
+  }
+}
+
 class RecordSchema<
   K extends Schema<string | number, any>,
   V extends Schema<any, any>
@@ -452,8 +808,8 @@ class RecordSchema<
   private keySchema: K;
   private valueSchema: V;
 
-  constructor(keySchema: K, valueSchema: V) {
-    super("record", {}, validatorMap, preparationMap, transformationMap);
+  constructor(keySchema: K, valueSchema: V, config: ValidatorConfig<any> = {}) {
+    super("record", config, validatorMap, preparationMap, transformationMap);
     this.keySchema = keySchema;
     this.valueSchema = valueSchema;
   }
@@ -461,43 +817,69 @@ class RecordSchema<
   protected async _parse(
     context: ValidationContext
   ): Promise<Record<s.infer<K>, s.infer<V>>> {
+    let current_value: any = context.value;
+
     if (
-      typeof context.value !== "object" ||
-      context.value === null ||
-      Array.isArray(context.value)
+      typeof current_value !== "object" ||
+      current_value === null ||
+      Array.isArray(current_value)
     ) {
       throw new ValidationError([
-        { path: context.path, message: "Invalid type. Expected an object." },
+        { path: context.path, message: "Input must be a record-like object." },
       ]);
     }
 
-    const newRecord: Record<any, any> = {};
+    const finalRecord: Record<string | number, s.infer<V>> = {};
+    const issues: ValidationIssue[] = [];
 
-    for (const [key, value] of Object.entries(context.value)) {
-      const keyResult = await this.keySchema.safeParse({
-        ...context,
-        path: [...context.path, key, "key"],
-        value: key,
-      });
+    for (const [key, value] of Object.entries(current_value)) {
+      let parsedKey: s.infer<K>;
+      let parsedValue: s.infer<V>;
 
-      if (keyResult.status === "error") {
-        throw keyResult.error;
+      try {
+        parsedKey = (await this.keySchema.parse({
+          ...context,
+          path: [...context.path, key],
+          value: key,
+        })) as s.infer<K>;
+      } catch (error) {
+        if (error instanceof ValidationError) {
+          issues.push(...error.issues);
+        } else {
+          issues.push({
+            path: [...context.path, key],
+            message: "Invalid key",
+          });
+        }
+        continue;
       }
 
-      const valueResult = await this.valueSchema.safeParse({
-        ...context,
-        path: [...context.path, key, "value"],
-        value: value,
-      });
-
-      if (valueResult.status === "error") {
-        throw valueResult.error;
+      try {
+        parsedValue = await this.valueSchema.parse({
+          ...context,
+          path: [...context.path, key],
+          value: value,
+        });
+      } catch (error) {
+        if (error instanceof ValidationError) {
+          issues.push(...error.issues);
+        } else {
+          issues.push({
+            path: [...context.path, key],
+            message: "Invalid value",
+          });
+        }
+        continue;
       }
 
-      newRecord[keyResult.data] = valueResult.data;
+      finalRecord[parsedKey as any] = parsedValue;
     }
 
-    return newRecord;
+    if (issues.length > 0) {
+      throw new ValidationError(issues);
+    }
+
+    return finalRecord as Record<s.infer<K>, s.infer<V>>;
   }
 }
 
@@ -733,11 +1115,13 @@ class UnionSchema<
 }
 
 type CreateSchemaBuilder<TMap extends SchemaValidatorMap> = {
-  [K in keyof Omit<TMap, "object">]: <C extends ValidatorConfig<TMap[K]>>(
+  [K in keyof Omit<TMap, "object" | "array">]: <
+    C extends ValidatorConfig<TMap[K]>
+  >(
     config?: C
   ) => Schema<
     InferDataType<TMap[K]>,
-    C extends { preparations: any } ? unknown : InferDataType<TMap[K]>
+    C extends { prepare: any } ? unknown : InferDataType<TMap[K]>
   >;
 } & {
   object<P extends SObjectProperties>(
@@ -771,6 +1155,9 @@ type CreateSchemaBuilder<TMap extends SchemaValidatorMap> = {
   instanceof<T extends new (...args: any) => any>(
     constructorFn: T
   ): InstanceOfSchema<T>;
+  array<T extends Schema<any, any>>(
+    config: ValidatorConfig<any> & { validate: { ofType: T } }
+  ): ArraySchema<T>;
 };
 
 function createSchemaFunction<
@@ -787,7 +1174,7 @@ function createSchemaFunction<
       ? WithOptional | null
       : WithOptional;
 
-    type InputType = C extends { preparations: Record<string, unknown> }
+    type InputType = C extends { prepare: Record<string, unknown> }
       ? unknown
       : WithNullable;
 
@@ -808,28 +1195,28 @@ export function createSchemaBuilder<TMap extends SchemaValidatorMap>(
 ): CreateSchemaBuilder<TMap> {
   const builder: any = {};
 
-  for (const dataType in validatorMap) {
-    if (dataType === "object") continue;
-    builder[dataType] = createSchemaFunction(dataType, validatorMap);
+  for (const key in validatorMap) {
+    if (key === "object" || key === "array") continue;
+    builder[key] = createSchemaFunction(key, validatorMap);
   }
 
-  builder.object = function <P extends SObjectProperties>(
-    config: SObjectOptions<P>
-  ) {
-    if (config.strict) {
-      return new ObjectSchema<P, InferSObjectType<P>>(config);
-    }
-    return new ObjectSchema<P, WithLoose<InferSObjectType<P>>>(config);
-  };
+  builder.object = <P extends SObjectProperties>(config: SObjectOptions<P>) =>
+    new ObjectSchema(config);
 
-  builder.record = function <
+  builder.array = <T extends Schema<any, any>>(
+    config: ValidatorConfig<any> & { validate: { ofType: T } }
+  ) => new ArraySchema(config);
+
+  builder.record = <
     K extends Schema<string | number, any>,
     V extends Schema<any, any>
-  >(keySchema: K, valueSchema: V) {
-    return new RecordSchema(keySchema, valueSchema);
-  };
+  >(
+    keySchema: K,
+    valueSchema: V,
+    config?: ValidatorConfig<any>
+  ) => new RecordSchema(keySchema, valueSchema, config);
 
-  builder.switch = function <
+  builder.switch = <
     TKey extends string | number,
     TCases extends SwitchCase<any>,
     TDefault extends SwitchDefault<any>
@@ -837,7 +1224,7 @@ export function createSchemaBuilder<TMap extends SchemaValidatorMap>(
     keyFn: (context: ValidationContext) => TKey,
     schemas: TCases,
     defaultSchema?: TDefault
-  ) {
+  ) => {
     return new SwitchSchema(keyFn, schemas, defaultSchema);
   };
 

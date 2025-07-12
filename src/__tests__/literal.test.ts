@@ -10,9 +10,8 @@ describe("Literal Validator", () => {
 
   it("should throw for an incorrect string literal", async () => {
     const schema = s.literal("hello");
-    await expect((schema as any).parse("world")).rejects.toThrow(
-      ValidationError
-    );
+    // @ts-expect-error
+    await expect(schema.parse("world")).rejects.toThrow(ValidationError);
   });
 
   it("should pass for a correct number literal", async () => {
