@@ -46,6 +46,10 @@ type InferDataType<VCollection> = VCollection extends {
   ? T
   : unknown;
 
+type InferSchemaType<T extends Schema<any>> = T extends Schema<infer U>
+  ? U
+  : never;
+
 function isValidationContext(thing: any): thing is ValidationContext {
   return (
     typeof thing === "object" &&
@@ -99,9 +103,9 @@ export class Schema<T> {
     }
   }
 
-  public parse(data: T): T;
-  public parse(context: ValidationContext): T;
-  public parse(dataOrContext: T | ValidationContext): T {
+  public async parse(data: T): Promise<T>;
+  public async parse(context: ValidationContext): Promise<T>;
+  public async parse(dataOrContext: T | ValidationContext): Promise<T> {
     const context: ValidationContext = isValidationContext(dataOrContext)
       ? dataOrContext
       : {
@@ -113,15 +117,22 @@ export class Schema<T> {
     return this._parse(context);
   }
 
-  public safeParse(data: T): SafeParseResult<T>;
-  public safeParse(context: ValidationContext): SafeParseResult<T>;
-  public safeParse(dataOrContext: T | ValidationContext): SafeParseResult<T> {
+  public async safeParse(data: T): Promise<SafeParseResult<T>>;
+  public async safeParse(
+    context: ValidationContext
+  ): Promise<SafeParseResult<T>>;
+  public async safeParse(
+    dataOrContext: T | ValidationContext
+  ): Promise<SafeParseResult<T>> {
     const context: ValidationContext = isValidationContext(dataOrContext)
       ? dataOrContext
-      : { rootData: dataOrContext, path: [], value: dataOrContext };
-
+      : {
+          rootData: dataOrContext,
+          path: [],
+          value: dataOrContext,
+        };
     try {
-      const data = this._parse(context);
+      const data = await this._parse(context);
       return { status: "success", data };
     } catch (e) {
       if (e instanceof ValidationError) {
@@ -131,7 +142,7 @@ export class Schema<T> {
     }
   }
 
-  protected _parse(context: ValidationContext): T {
+  protected async _parse(context: ValidationContext): Promise<T> {
     if (this.config.optional && context.value === undefined) {
       return context.value;
     }
@@ -141,8 +152,39 @@ export class Schema<T> {
 
     const issues: ValidationIssue[] = [];
 
+    const identityValidator = this.validators.find(
+      (v) => v.name === "identity"
+    );
+    if (identityValidator) {
+      const result = await identityValidator.validator(
+        context.value,
+        identityValidator.args,
+        context
+      );
+      if (!result) {
+        const path = context.path.join(".");
+        const messages = this.config.messages as
+          | { [key: string]: string }
+          | undefined;
+        let message = messages?.identity;
+
+        if (!message) {
+          message = `Invalid type. Expected ${
+            this.dataType
+          }, received ${typeof context.value}. Path: '${path}'`;
+        }
+        issues.push({
+          path: context.path,
+          message,
+        });
+        throw new ValidationError(issues); // Throw immediately
+      }
+    }
+
     for (const { name, validator, args } of this.validators) {
-      if (!validator(context.value, args, context)) {
+      if (name === "identity") continue;
+      const result = await validator(context.value, args, context);
+      if (!result) {
         const path = context.path.join(".");
         const messages = this.config.messages as
           | { [key: string]: string }
@@ -190,7 +232,7 @@ class SwitchSchema<T> extends Schema<T> {
     this.defaultSchema = defaultSchema;
   }
 
-  protected _parse(context: ValidationContext): T {
+  protected async _parse(context: ValidationContext): Promise<T> {
     const key = this.keyFn(context);
     const schema = this.schemas[key] || this.defaultSchema;
 
@@ -198,6 +240,36 @@ class SwitchSchema<T> extends Schema<T> {
       return schema.parse(context);
     }
     return context.value;
+  }
+}
+
+class UnionSchema<T extends [Schema<any>, ...Schema<any>[]]> extends Schema<
+  InferSchemaType<T[number]>
+> {
+  private schemas: T;
+
+  constructor(schemas: T) {
+    super("union", {}, validatorMap as SchemaValidatorMap);
+    this.schemas = schemas;
+  }
+
+  protected async _parse(
+    context: ValidationContext
+  ): Promise<InferSchemaType<T[number]>> {
+    const issues: ValidationIssue[] = [];
+    for (const schema of this.schemas) {
+      try {
+        // Since .parse() is now async, we must await it.
+        return await schema.parse(context);
+      } catch (e) {
+        if (e instanceof ValidationError) {
+          issues.push(...e.issues);
+        } else {
+          throw e;
+        }
+      }
+    }
+    throw new ValidationError(issues);
   }
 }
 
@@ -211,6 +283,7 @@ type CreateSchemaBuilder<TMap extends SchemaValidatorMap> = {
     schemas: Record<TKey, TSchema>,
     defaultSchema?: TSchema
   ): TSchema;
+  union<T extends [Schema<any>, ...Schema<any>[]]>(schemas: T): UnionSchema<T>;
 };
 
 function createSchemaFunction<
@@ -241,6 +314,10 @@ export function createSchemaBuilder<TMap extends SchemaValidatorMap>(
     defaultSchema?: TSchema
   ) => {
     return new SwitchSchema(keyFn, schemas, defaultSchema);
+  };
+
+  builder.union = <T extends [Schema<any>, ...Schema<any>[]]>(schemas: T) => {
+    return new UnionSchema(schemas);
   };
 
   return builder;

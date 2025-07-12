@@ -4,6 +4,7 @@ import { Schema } from "../index.js";
 export interface SchemaLike {
   readonly config: Record<string, unknown>;
   parse(context: ValidationContext): any;
+  safeParse(context: ValidationContext): Promise<SafeParseResult<any>>;
 }
 
 // The simplified context object passed through the validation chain.
@@ -21,7 +22,7 @@ export type ValidatorFunction<T = any, Args extends any[] = any[]> = (
   value: T,
   args: Args,
   context: ValidationContext
-) => boolean;
+) => boolean | Promise<boolean>;
 
 // A collection of validators for a specific data type.
 export type ValidatorCollection<T = any> = {

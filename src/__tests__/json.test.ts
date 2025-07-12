@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { s } from "../index.js";
+import { ValidationError } from "../validators/types.js";
 
 describe("json validator", () => {
-  it("should validate a string containing JSON that matches the schema", () => {
+  it("should validate a string containing JSON that matches the schema", async () => {
     const schema = s.string({
       json: s.object({
         properties: {
@@ -13,10 +14,10 @@ describe("json validator", () => {
     });
 
     const data = JSON.stringify({ name: "John Doe", age: 30 });
-    expect(() => schema.parse(data)).not.toThrow();
+    await expect(schema.parse(data)).resolves.toBe(data);
   });
 
-  it("should throw an error for a string containing JSON that does not match the schema", () => {
+  it("should throw an error for a string containing JSON that does not match the schema", async () => {
     const schema = s.string({
       json: s.object({
         properties: {
@@ -27,10 +28,10 @@ describe("json validator", () => {
     });
 
     const data = JSON.stringify({ name: "John Doe", age: "30" }); // age is a string
-    expect(() => schema.parse(data)).toThrow();
+    await expect(schema.parse(data)).rejects.toThrow(ValidationError);
   });
 
-  it("should throw an error for a string that is not valid JSON", () => {
+  it("should throw an error for a string that is not valid JSON", async () => {
     const schema = s.string({
       json: s.object({
         properties: {
@@ -40,10 +41,10 @@ describe("json validator", () => {
     });
 
     const data = "not a json string";
-    expect(() => schema.parse(data)).toThrow();
+    await expect(schema.parse(data)).rejects.toThrow(ValidationError);
   });
 
-  it("should throw an error if the value is not a string", () => {
+  it("should throw an error if the value is not a string", async () => {
     const schema = s.string({
       json: s.object({
         properties: {
@@ -53,10 +54,10 @@ describe("json validator", () => {
     });
 
     const data = 123;
-    expect(() => schema.parse(data as any)).toThrow();
+    await expect(schema.parse(data as any)).rejects.toThrow(ValidationError);
   });
 
-  it("should handle nested JSON schemas", () => {
+  it("should handle nested JSON schemas", async () => {
     const schema = s.string({
       json: s.object({
         properties: {
@@ -82,7 +83,7 @@ describe("json validator", () => {
         },
       },
     });
-    expect(() => schema.parse(validData)).not.toThrow();
+    await expect(schema.parse(validData)).resolves.toBe(validData);
 
     const invalidData = JSON.stringify({
       user: {
@@ -92,6 +93,6 @@ describe("json validator", () => {
         },
       },
     });
-    expect(() => schema.parse(invalidData)).toThrow();
+    await expect(schema.parse(invalidData)).rejects.toThrow(ValidationError);
   });
 });

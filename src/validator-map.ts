@@ -1,42 +1,30 @@
-import { SchemaValidatorMap } from "./validators/types.js";
-// Validators
-import { stringValidatorMap } from "./validators/string.js";
-import { numberValidatorMap } from "./validators/number.js";
-import { booleanValidatorMap } from "./validators/boolean.js";
+import { Intersect, UnionToIntersection } from "./utils.js";
 import { arrayValidatorMap } from "./validators/array.js";
+import { booleanValidatorMap } from "./validators/boolean.js";
+import { numberValidatorMap } from "./validators/number.js";
 import { objectValidatorMap } from "./validators/object.js";
+import { stringValidatorMap } from "./validators/string.js";
+import { SchemaValidatorMap } from "./validators/types.js";
+import { dateValidatorMap } from "./validators/date.js";
+import { anyValidatorMap } from "./validators/any.js";
 
-export const validatorMap = mergeValidatorMaps(
-  stringValidatorMap,
-  numberValidatorMap,
-  booleanValidatorMap,
-  arrayValidatorMap,
-  objectValidatorMap
-);
+type ValidatorMapUnion =
+  | typeof stringValidatorMap
+  | typeof numberValidatorMap
+  | typeof booleanValidatorMap
+  | typeof objectValidatorMap
+  | typeof arrayValidatorMap
+  | typeof dateValidatorMap
+  | typeof anyValidatorMap;
 
-// A recursive type to intersect all types in a tuple.
-type Intersect<T extends readonly any[]> = T extends readonly [
-  infer Head,
-  ...infer Tail
-]
-  ? Head & Intersect<Tail>
-  : {};
+type MergedValidators = Intersect<UnionToIntersection<ValidatorMapUnion>>;
 
-/**
- * Merges one or more validator maps into a single validator map.
- * Later maps override validators from earlier maps when there are conflicts.
- *
- * @param maps - One or more validator maps to merge
- * @returns A new merged validator map
- */
-export function mergeValidatorMaps<T extends readonly Record<string, any>[]>(
-  ...maps: readonly [...T]
-): Intersect<T> {
-  const result = {} as any;
-
-  for (const map of maps) {
-    Object.assign(result, map);
-  }
-
-  return result;
-}
+export const validatorMap: MergedValidators = {
+  ...stringValidatorMap,
+  ...numberValidatorMap,
+  ...booleanValidatorMap,
+  ...objectValidatorMap,
+  ...arrayValidatorMap,
+  ...dateValidatorMap,
+  ...anyValidatorMap,
+};

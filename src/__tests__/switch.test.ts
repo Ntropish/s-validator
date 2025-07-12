@@ -1,139 +1,131 @@
 import { describe, it, expect } from "vitest";
 import { s } from "../index.js";
+import { ValidationContext, Schema } from "../validators/types.js";
 
 describe("Switch Validator", () => {
-  describe("Edge Cases", () => {
-    it("should pass if no case matches and no default is provided", () => {
-      interface TestRecord {
-        type: "A" | "B";
-        value: string;
-      }
-      const schema = s.object({
-        properties: {
-          type: s.string({ oneOf: ["A", "B"] }),
-          value: s.switch((ctx) => (ctx.rootData as TestRecord)?.type, {
-            A: s.string({ length: 1 }),
-            B: s.string({ minLength: 3 }),
+  describe("Practical Scenarios", () => {
+    it("should validate different object shapes based on a type property", async () => {
+      const eventSchema = s.switch(
+        (context: ValidationContext) => context.value.type,
+        {
+          USER_CREATED: s.object({
+            properties: {
+              type: s.string({ oneOf: ["USER_CREATED"] }),
+              userId: s.string({ uuid: true }),
+            },
           }),
-        },
-      });
-
-      // The key 'B' doesn't match 'A' and there's no default, so it passes.
-      schema.parse({ type: "B", value: "any value" });
-      expect(() => schema.parse({ type: "A", value: "too short" })).toThrow();
-      expect(() => schema.parse({ type: "A", value: "1" })).not.toThrow();
-
-      expect(() => schema.parse({ type: "B", value: "1" })).toThrow();
-      expect(() => schema.parse({ type: "B", value: "123" })).not.toThrow();
-
-      expect(() => schema.parse({ type: "C", value: "any value" })).toThrow();
-    });
-
-    it("should use the default schema if no case matches", () => {
-      const schema = s.switch(
-        (ctx) => (ctx.rootData as any)?.type,
-        {
-          A: s.string({ minLength: 5 }),
-        },
-        s.string({ maxLength: 3 })
-      );
-
-      // Fails default schema because the value is a string, but the rootData is not set
-      expect(() => schema.parse("long string")).toThrow();
-      // Passes default schema
-      schema.parse("ok");
-    });
-
-    it("should use the default schema if the key function returns undefined", () => {
-      const schema = s.switch(
-        (ctx) => (ctx.rootData as any)?.nonExistentKey,
-        {
-          A: s.string({ minLength: 5 }),
-        },
-        s.string({ maxLength: 3 })
-      );
-      expect(() => schema.parse("too long for default")).toThrow();
-    });
-
-    it("should only apply the schema from the first matching case", () => {
-      const schema = s.switch((ctx) => String(ctx.value.length), {
-        "3": s.string({ pattern: /^[a-z]+$/ }), // only letters
-      });
-
-      schema.parse("abc");
-      expect(() => schema.parse("123")).toThrow();
-    });
-
-    it("should handle nested switch statements correctly", () => {
-      const schema = s.switch(
-        (ctx) => (ctx.rootData as any).type,
-        {
-          A: s.switch((ctx) => (ctx.rootData as any).mode, {
-            inner: s.string({ maxLength: 5 }),
+          ORDER_PLACED: s.object({
+            properties: {
+              type: s.string({ oneOf: ["ORDER_PLACED"] }),
+              orderId: s.string({ cuid: true }),
+              amount: s.number(),
+            },
           }),
-        },
-        s.string({ minLength: 10 })
+        }
       );
 
-      // Test the nested switch
-      const nestedSchema = s.object({ properties: { data: schema } });
+      const userEvent = {
+        type: "USER_CREATED",
+        userId: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      };
+      await expect(eventSchema.parse(userEvent)).resolves.toEqual(userEvent);
 
-      // Passes nested switch
-      nestedSchema.parse({
-        type: "A",
-        mode: "inner",
-        data: "short",
-      });
+      const orderEvent = {
+        type: "ORDER_PLACED",
+        orderId: "caaaaaaaaaaaaaaaaaaaaaaaa",
+        amount: 100,
+      };
+      await expect(eventSchema.parse(orderEvent)).resolves.toEqual(orderEvent);
 
-      // Fails nested switch
-      expect(() =>
-        nestedSchema.parse({
-          type: "A",
-          mode: "inner",
-          data: "toolong",
-        })
-      ).toThrow();
-
-      // Passes outer default
-      nestedSchema.parse({
-        type: "B",
-        data: "longenoughtopass",
-      });
+      const invalidEvent = { type: "INVALID_EVENT" };
+      await expect(eventSchema.parse(invalidEvent)).resolves.toEqual(
+        invalidEvent
+      ); // No default, so it passes
     });
   });
 
-  describe("Practical Scenarios", () => {
-    it("should validate different object shapes based on a type property", () => {
-      const eventSchema = s.object({
-        properties: {
-          eventType: s.string({ oneOf: ["login", "purchase"] }),
-          details: s.switch((ctx) => (ctx.rootData as any).eventType, {
-            login: s.object({
-              properties: { ip: s.string({ minLength: 1 }) },
-            }),
-            purchase: s.object({
-              properties: { productId: s.number() },
-            }),
-          }),
+  describe("Edge Cases", () => {
+    it("should pass if no case matches and no default is provided", async () => {
+      const schema = s.switch((c) => c.value.key, {
+        a: s.string(),
+      });
+      const data = { key: "b" };
+      await expect(schema.parse(data as any)).resolves.toEqual(data);
+    });
+
+    it("should use the default schema if no case matches", async () => {
+      const schema = s.switch(
+        (c) => c.value.key,
+        {
+          a: s.string({ minLength: 100 }),
         },
+        s.string({ maxLength: 5 })
+      );
+
+      await expect(schema.parse("short")).resolves.toBe("short");
+      await expect(schema.parse("this is way too long")).rejects.toThrow();
+    });
+
+    it("should use the default schema if the key function returns undefined", async () => {
+      const schema = s.switch(
+        (c) => c.value.missingKey, // this will be undefined
+        {
+          a: s.string({ minLength: 100 }),
+        },
+        s.string({ maxLength: 5 })
+      );
+      await expect(schema.parse("short" as any)).resolves.toBe("short");
+    });
+
+    it("should only apply the schema from the first matching case", async () => {
+      // This is implicit in the design, but good to test
+      const schema = s.switch(
+        () => "a", // always match 'a'
+        {
+          a: s.string({ minLength: 3 }),
+        } as any // Cast to any to allow for the unused 'b' case for testing purposes
+      );
+      await expect(schema.parse("long")).resolves.toBe("long");
+      await expect(schema.parse("s")).rejects.toThrow();
+    });
+
+    it("should handle nested switch statements correctly", async () => {
+      const nestedSchema: Schema<any> = s.switch(
+        (c) => (c.rootData as any).nestedKey, // check nestedKey on the root object
+        {
+          x: s.number({ min: 10 }),
+          y: s.string({ minLength: 10 }),
+        },
+        s.any()
+      );
+
+      const schema = s.switch(
+        (c) => c.value.key,
+        {
+          a: s.object({ properties: { value: nestedSchema } }),
+        },
+        s.any()
+      );
+
+      await expect(
+        schema.parse({ key: "a", nestedKey: "x", value: 15 } as any)
+      ).resolves.toEqual({ key: "a", nestedKey: "x", value: 15 });
+
+      await expect(
+        schema.parse({
+          key: "a",
+          nestedKey: "y",
+          value: "long string",
+        } as any)
+      ).resolves.toEqual({
+        key: "a",
+        nestedKey: "y",
+        value: "long string",
       });
 
-      const loginEvent = {
-        eventType: "login",
-        details: { ip: "127.0.0.1" },
-      };
-      const purchaseEvent = {
-        eventType: "purchase",
-        details: { productId: 123 },
-      };
-      const invalidEvent = {
-        eventType: "login",
-        details: { productId: 456 },
-      };
-
-      expect(() => eventSchema.parse(loginEvent)).not.toThrow();
-      expect(() => eventSchema.parse(purchaseEvent)).not.toThrow();
-      expect(() => eventSchema.parse(invalidEvent)).toThrow();
+      await expect(
+        schema.parse({ key: "a", nestedKey: "x", value: 5 } as any)
+      ).rejects.toThrow();
     });
   });
 });

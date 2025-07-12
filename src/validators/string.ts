@@ -83,8 +83,7 @@ export const stringValidatorMap = {
       if (enabled === undefined) return true;
       return enabled ? regex.semver.test(value) : !regex.semver.test(value);
     },
-    url: (value: string, [enabled]: [boolean?]) => {
-      if (enabled === undefined) return true;
+    url: (value: string, [enabled = true]: [boolean?]) => {
       return enabled ? regex.url.test(value) : !regex.url.test(value);
     },
     uuid: (value: string, [enabled]: [boolean?]) => {
@@ -97,14 +96,15 @@ export const stringValidatorMap = {
         ? regex.isoDateTime.test(value)
         : !regex.isoDateTime.test(value);
     },
-    json: (value: string, [schema]: [SchemaLike], context) => {
+    json: async (value: string, [schema]: [SchemaLike], context) => {
+      let parsed: any;
       try {
-        const parsed = JSON.parse(value);
-        schema.parse({ ...context, value: parsed });
-        return true;
+        parsed = JSON.parse(value);
       } catch (e) {
         return false;
       }
+      const result = await schema.safeParse({ ...context, value: parsed });
+      return result.status === "success";
     },
     email: (
       value: string,

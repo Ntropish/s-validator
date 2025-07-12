@@ -1,39 +1,45 @@
 import { describe, it, expect } from "vitest";
 import { s } from "../index.js";
+import { ValidationError } from "../validators/types.js";
 
 describe("Validation", () => {
-  it("should validate a string", () => {
-    s.string({
-      length: 10,
-    }).parse("1234567890");
-  });
-
-  it("should validate an object", () => {
-    s.object({
-      properties: {
-        name: s.string({
-          range: [1, 10],
-        }),
-        age: s.number({
-          min: 18,
-          max: 130,
-        }),
-      },
-    }).parse({
-      name: "John",
-      age: 20,
-    });
-  });
-
-  it("should use custom error messages when provided", () => {
-    const customMessage = "Username must be at least 3 characters long.";
+  it("should validate a string", async () => {
     const schema = s.string({
       minLength: 3,
-      messages: {
-        minLength: customMessage,
+      maxLength: 10,
+    });
+    await expect(schema.parse("hello")).resolves.toBe("hello");
+    await expect(schema.parse("hi")).rejects.toThrow(ValidationError);
+    await expect(schema.parse("this is too long")).rejects.toThrow(
+      ValidationError
+    );
+  });
+
+  it("should validate an object", async () => {
+    const schema = s.object({
+      properties: {
+        name: s.string({ minLength: 2 }),
+        age: s.number({ min: 18 }),
       },
     });
+    await expect(schema.parse({ name: "John Doe", age: 30 })).resolves.toEqual({
+      name: "John Doe",
+      age: 30,
+    });
+    await expect(schema.parse({ name: "J", age: 30 })).rejects.toThrow(
+      ValidationError
+    );
+  });
 
-    expect(() => schema.parse("hi")).toThrow(customMessage);
+  it("should use custom error messages when provided", async () => {
+    const schema = s.string({
+      minLength: 5,
+      messages: {
+        minLength: "String must be at least 5 characters long",
+      },
+    });
+    await expect(schema.parse("hi")).rejects.toThrow(
+      "String must be at least 5 characters long"
+    );
   });
 });

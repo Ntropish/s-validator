@@ -3,421 +3,462 @@ import { s } from "../index.js";
 
 describe("String Validators", () => {
   describe("url", () => {
-    it("should validate a correct URL", () => {
+    it("should validate a correct URL", async () => {
       const schema = s.string({ url: true });
-      expect(() => schema.parse("https://google.com")).not.toThrow();
-      expect(() => schema.parse("http://example.com/some/path")).not.toThrow();
-      expect(() => schema.parse("ftp://ftp.example.com")).not.toThrow();
+      await expect(schema.parse("https://google.com")).resolves.toBe(
+        "https://google.com"
+      );
+      await expect(schema.parse("http://example.com/some/path")).resolves.toBe(
+        "http://example.com/some/path"
+      );
+      await expect(schema.parse("ftp://ftp.example.com")).resolves.toBe(
+        "ftp://ftp.example.com"
+      );
     });
 
-    it("should throw an error for an invalid URL", () => {
+    it("should throw an error for an invalid URL", async () => {
       const schema = s.string({ url: true });
-      expect(() => schema.parse("google")).toThrow();
-      expect(() => schema.parse("not a url")).toThrow();
+      await expect(schema.parse("google-com")).rejects.toThrow();
+      await expect(schema.parse("not a url")).rejects.toThrow();
     });
 
-    it("should validate a non-URL when url is false", () => {
+    it("should validate a non-URL when url is false", async () => {
       const schema = s.string({ url: false });
-      expect(() => schema.parse("not a url")).not.toThrow();
+      await expect(schema.parse("not a url")).resolves.toBe("not a url");
     });
 
-    it("should throw an error for a URL when url is false", () => {
+    it("should throw an error for a URL when url is false", async () => {
       const schema = s.string({ url: false });
-      expect(() => schema.parse("https://google.com")).toThrow();
+      await expect(schema.parse("https://google.com")).rejects.toThrow();
     });
   });
 
   describe("cuid", () => {
-    it("should validate a correct CUID", () => {
+    it("should validate a correct CUID", async () => {
       const schema = s.string({ cuid: true });
-      expect(() => schema.parse("caaaaaaaaaaaaaaaaaaaaaaaa")).not.toThrow();
-      expect(() => schema.parse("c3z2y1x0w9v8u7t6s5r4q32o1")).not.toThrow();
+      await expect(schema.parse("caaaaaaaaaaaaaaaaaaaaaaaa")).resolves.toBe(
+        "caaaaaaaaaaaaaaaaaaaaaaaa"
+      );
     });
 
-    it("should throw an error for an invalid CUID", () => {
+    it("should throw an error for an invalid CUID", async () => {
       const schema = s.string({ cuid: true });
-      expect(() => schema.parse("not a cuid")).toThrow();
+      await expect(schema.parse("not a cuid")).rejects.toThrow();
     });
 
-    it("should validate a non-CUID when cuid is false", () => {
+    it("should validate a non-CUID when cuid is false", async () => {
       const schema = s.string({ cuid: false });
-      expect(() => schema.parse("not a cuid")).not.toThrow();
+      await expect(schema.parse("not a cuid")).resolves.toBe("not a cuid");
     });
 
-    it("should throw an error for a CUID when cuid is false", () => {
+    it("should throw an error for a CUID when cuid is false", async () => {
       const schema = s.string({ cuid: false });
-      expect(() => schema.parse("caaaaaaaaaaaaaaaaaaaaaaaa")).toThrow();
+      await expect(schema.parse("caaaaaaaaaaaaaaaaaaaaaaaa")).rejects.toThrow();
     });
   });
 
   describe("cuid2", () => {
-    it("should validate a correct CUID2", () => {
+    it("should validate a correct CUID2", async () => {
       const schema = s.string({ cuid2: true });
-      expect(() => schema.parse("cky2y1x0w9v8u7t6s5r4q3p2o1")).not.toThrow();
+      await expect(schema.parse("cky2y1x0w9v8u7t6s5r4q3p2o1")).resolves.toBe(
+        "cky2y1x0w9v8u7t6s5r4q3p2o1"
+      );
     });
 
-    it("should throw an error for an invalid CUID2", () => {
+    it("should throw an error for an invalid CUID2", async () => {
       const schema = s.string({ cuid2: true });
-      expect(() => schema.parse("123")).toThrow();
+      await expect(schema.parse("123")).rejects.toThrow();
     });
 
-    it("should validate a non-CUID2 when cuid2 is false", () => {
+    it("should validate a non-CUID2 when cuid2 is false", async () => {
       const schema = s.string({ cuid2: false });
-      expect(() => schema.parse("123")).not.toThrow();
+      await expect(schema.parse("123")).resolves.toBe("123");
     });
 
-    it("should throw an error for a CUID2 when cuid2 is false", () => {
+    it("should throw an error for a CUID2 when cuid2 is false", async () => {
       const schema = s.string({ cuid2: false });
-      expect(() => schema.parse("cky2y1x0w9v8u7t6s5r4q3p2o1")).toThrow();
+      await expect(
+        schema.parse("cky2y1x0w9v8u7t6s5r4q3p2o1")
+      ).rejects.toThrow();
     });
   });
 
   describe("ulid", () => {
-    it("should validate a correct ULID", () => {
+    it("should validate a correct ULID", async () => {
       const schema = s.string({ ulid: true });
-      expect(() => schema.parse("01H8XGJWBWBAQ4JDB3A4S9A1Z7")).not.toThrow();
+      await expect(schema.parse("01H8XGJWBWBAQ4JDB3A4S9A1Z7")).resolves.toBe(
+        "01H8XGJWBWBAQ4JDB3A4S9A1Z7"
+      );
     });
 
-    it("should throw an error for an invalid ULID", () => {
+    it("should throw an error for an invalid ULID", async () => {
       const schema = s.string({ ulid: true });
-      expect(() => schema.parse("not a ulid")).toThrow();
+      await expect(schema.parse("not a ulid")).rejects.toThrow();
     });
 
-    it("should validate a non-ULID when ulid is false", () => {
+    it("should validate a non-ULID when ulid is false", async () => {
       const schema = s.string({ ulid: false });
-      expect(() => schema.parse("not a ulid")).not.toThrow();
+      await expect(schema.parse("not a ulid")).resolves.toBe("not a ulid");
     });
 
-    it("should throw an error for a ULID when ulid is false", () => {
+    it("should throw an error for a ULID when ulid is false", async () => {
       const schema = s.string({ ulid: false });
-      expect(() => schema.parse("01H8XGJWBWBAQ4JDB3A4S9A1Z7")).toThrow();
+      await expect(
+        schema.parse("01H8XGJWBWBAQ4JDB3A4S9A1Z7")
+      ).rejects.toThrow();
     });
   });
 
   describe("emoji", () => {
-    it("should validate a correct emoji", () => {
+    it("should validate a correct emoji", async () => {
       const schema = s.string({ emoji: true });
-      expect(() => schema.parse("👍")).not.toThrow();
+      await expect(schema.parse("👍")).resolves.toBe("👍");
     });
 
-    it("should throw an error for an invalid emoji", () => {
+    it("should throw an error for an invalid emoji", async () => {
       const schema = s.string({ emoji: true });
-      expect(() => schema.parse("not an emoji")).toThrow();
+      await expect(schema.parse("not an emoji")).rejects.toThrow();
     });
 
-    it("should validate a non-emoji when emoji is false", () => {
+    it("should validate a non-emoji when emoji is false", async () => {
       const schema = s.string({ emoji: false });
-      expect(() => schema.parse("not an emoji")).not.toThrow();
+      await expect(schema.parse("not an emoji")).resolves.toBe("not an emoji");
     });
 
-    it("should throw an error for an emoji when emoji is false", () => {
+    it("should throw an error for an emoji when emoji is false", async () => {
       const schema = s.string({ emoji: false });
-      expect(() => schema.parse("👍")).toThrow();
+      await expect(schema.parse("👍")).rejects.toThrow();
     });
   });
 
   describe("ipv4", () => {
-    it("should validate a correct IPv4 address", () => {
+    it("should validate a correct IPv4 address", async () => {
       const schema = s.string({ ipv4: true });
-      expect(() => schema.parse("192.168.1.1")).not.toThrow();
+      await expect(schema.parse("192.168.1.1")).resolves.toBe("192.168.1.1");
     });
 
-    it("should throw an error for an invalid IPv4 address", () => {
+    it("should throw an error for an invalid IPv4 address", async () => {
       const schema = s.string({ ipv4: true });
-      expect(() => schema.parse("999.999.999.999")).toThrow();
+      await expect(schema.parse("999.999.999.999")).rejects.toThrow();
     });
 
-    it("should validate a non-IPv4 address when ipv4 is false", () => {
+    it("should validate a non-IPv4 address when ipv4 is false", async () => {
       const schema = s.string({ ipv4: false });
-      expect(() => schema.parse("999.999.999.999")).not.toThrow();
+      await expect(schema.parse("999.999.999.999")).resolves.toBe(
+        "999.999.999.999"
+      );
     });
 
-    it("should throw an error for an IPv4 address when ipv4 is false", () => {
+    it("should throw an error for an IPv4 address when ipv4 is false", async () => {
       const schema = s.string({ ipv4: false });
-      expect(() => schema.parse("192.168.1.1")).toThrow();
+      await expect(schema.parse("192.168.1.1")).rejects.toThrow();
     });
   });
 
   describe("ipv4Cidr", () => {
-    it("should validate a correct IPv4 CIDR block", () => {
+    it("should validate a correct IPv4 CIDR block", async () => {
       const schema = s.string({ ipv4Cidr: true });
-      expect(() => schema.parse("192.168.1.0/24")).not.toThrow();
+      await expect(schema.parse("192.168.1.0/24")).resolves.toBe(
+        "192.168.1.0/24"
+      );
     });
 
-    it("should throw an error for an invalid IPv4 CIDR block", () => {
+    it("should throw an error for an invalid IPv4 CIDR block", async () => {
       const schema = s.string({ ipv4Cidr: true });
-      expect(() => schema.parse("192.168.1.0")).toThrow();
+      await expect(schema.parse("192.168.1.0")).rejects.toThrow();
     });
 
-    it("should validate a non-IPv4 CIDR block when ipv4Cidr is false", () => {
+    it("should validate a non-IPv4 CIDR block when ipv4Cidr is false", async () => {
       const schema = s.string({ ipv4Cidr: false });
-      expect(() => schema.parse("192.168.1.0")).not.toThrow();
+      await expect(schema.parse("192.168.1.0")).resolves.toBe("192.168.1.0");
     });
 
-    it("should throw an error for an IPv4 CIDR block when ipv4Cidr is false", () => {
+    it("should throw an error for an IPv4 CIDR block when ipv4Cidr is false", async () => {
       const schema = s.string({ ipv4Cidr: false });
-      expect(() => schema.parse("192.168.1.0/24")).toThrow();
+      await expect(schema.parse("192.168.1.0/24")).rejects.toThrow();
     });
   });
 
   describe("ipv6", () => {
-    it("should validate a correct IPv6 address", () => {
+    it("should validate a correct IPv6 address", async () => {
       const schema = s.string({ ipv6: true });
-      expect(() =>
+      await expect(
         schema.parse("2001:0db8:85a3:0000:0000:8a2e:0370:7334")
-      ).not.toThrow();
+      ).resolves.toBe("2001:0db8:85a3:0000:0000:8a2e:0370:7334");
     });
 
-    it("should throw an error for an invalid IPv6 address", () => {
+    it("should throw an error for an invalid IPv6 address", async () => {
       const schema = s.string({ ipv6: true });
-      expect(() => schema.parse("not an ipv6")).toThrow();
+      await expect(schema.parse("not an ipv6")).rejects.toThrow();
     });
 
-    it("should validate a non-IPv6 address when ipv6 is false", () => {
+    it("should validate a non-IPv6 address when ipv6 is false", async () => {
       const schema = s.string({ ipv6: false });
-      expect(() => schema.parse("not an ipv6")).not.toThrow();
+      await expect(schema.parse("not an ipv6")).resolves.toBe("not an ipv6");
     });
 
-    it("should throw an error for an IPv6 address when ipv6 is false", () => {
+    it("should throw an error for an IPv6 address when ipv6 is false", async () => {
       const schema = s.string({ ipv6: false });
-      expect(() =>
+      await expect(
         schema.parse("2001:0db8:85a3:0000:0000:8a2e:0370:7334")
-      ).toThrow();
+      ).rejects.toThrow();
     });
   });
 
   describe("ipv6Cidr", () => {
-    it("should validate a correct IPv6 CIDR block", () => {
+    it("should validate a correct IPv6 CIDR block", async () => {
       const schema = s.string({ ipv6Cidr: true });
-      expect(() => schema.parse("2001:db8::/32")).not.toThrow();
+      await expect(schema.parse("2001:db8::/32")).resolves.toBe(
+        "2001:db8::/32"
+      );
     });
 
-    it("should throw an error for an invalid IPv6 CIDR block", () => {
+    it("should throw an error for an invalid IPv6 CIDR block", async () => {
       const schema = s.string({ ipv6Cidr: true });
-      expect(() => schema.parse("2001:db8::")).toThrow();
+      await expect(schema.parse("2001:db8::")).rejects.toThrow();
     });
 
-    it("should validate a non-IPv6 CIDR block when ipv6Cidr is false", () => {
+    it("should validate a non-IPv6 CIDR block when ipv6Cidr is false", async () => {
       const schema = s.string({ ipv6Cidr: false });
-      expect(() => schema.parse("2001:db8::")).not.toThrow();
+      await expect(schema.parse("2001:db8::")).resolves.toBe("2001:db8::");
     });
 
-    it("should throw an error for an IPv6 CIDR block when ipv6Cidr is false", () => {
+    it("should throw an error for an IPv6 CIDR block when ipv6Cidr is false", async () => {
       const schema = s.string({ ipv6Cidr: false });
-      expect(() => schema.parse("2001:db8::/32")).toThrow();
+      await expect(schema.parse("2001:db8::/32")).rejects.toThrow();
     });
   });
 
   describe("base64", () => {
-    it("should validate a correct base64 string", () => {
+    it("should validate a correct base64 string", async () => {
       const schema = s.string({ base64: true });
-      expect(() => schema.parse("SGVsbG8gV29ybGQ=")).not.toThrow();
+      await expect(schema.parse("SGVsbG8gV29ybGQ=")).resolves.toBe(
+        "SGVsbG8gV29ybGQ="
+      );
     });
 
-    it("should throw an error for an invalid base64 string", () => {
+    it("should throw an error for an invalid base64 string", async () => {
       const schema = s.string({ base64: true });
-      expect(() => schema.parse("not base64")).toThrow();
+      await expect(schema.parse("not base64")).rejects.toThrow();
     });
 
-    it("should validate a non-base64 string when base64 is false", () => {
+    it("should validate a non-base64 string when base64 is false", async () => {
       const schema = s.string({ base64: false });
-      expect(() => schema.parse("not base64")).not.toThrow();
+      await expect(schema.parse("not base64")).resolves.toBe("not base64");
     });
 
-    it("should throw an error for a base64 string when base64 is false", () => {
+    it("should throw an error for a base64 string when base64 is false", async () => {
       const schema = s.string({ base64: false });
-      expect(() => schema.parse("SGVsbG8gV29ybGQ=")).toThrow();
+      await expect(schema.parse("SGVsbG8gV29ybGQ=")).rejects.toThrow();
     });
   });
 
   describe("base64Url", () => {
-    it("should validate a correct base64url string", () => {
+    it("should validate a correct base64url string", async () => {
       const schema = s.string({ base64Url: true });
-      expect(() => schema.parse("SGVsbG8gV29ybGQ")).not.toThrow();
+      await expect(schema.parse("SGVsbG8gV29ybGQ")).resolves.toBe(
+        "SGVsbG8gV29ybGQ"
+      );
     });
 
-    it("should throw an error for an invalid base64url string", () => {
+    it("should throw an error for an invalid base64url string", async () => {
       const schema = s.string({ base64Url: true });
-      expect(() => schema.parse("SGVsbG8gV29ybGQ+")).toThrow();
+      await expect(schema.parse("SGVsbG8gV29ybGQ+")).rejects.toThrow();
     });
 
-    it("should validate a non-base64url string when base64Url is false", () => {
+    it("should validate a non-base64url string when base64Url is false", async () => {
       const schema = s.string({ base64Url: false });
-      expect(() => schema.parse("SGVsbG8gV29ybGQ+")).not.toThrow();
+      await expect(schema.parse("SGVsbG8gV29ybGQ+")).resolves.toBe(
+        "SGVsbG8gV29ybGQ+"
+      );
     });
 
-    it("should throw an error for a base64url string when base64Url is false", () => {
+    it("should throw an error for a base64url string when base64Url is false", async () => {
       const schema = s.string({ base64Url: false });
-      expect(() => schema.parse("SGVsbG8gV29ybGQ")).toThrow();
+      await expect(schema.parse("SGVsbG8gV29ybGQ")).rejects.toThrow();
     });
   });
 
   describe("date", () => {
-    it("should validate a correct ISO 8601 date string", () => {
+    it("should validate a correct ISO 8601 date string", async () => {
       const schema = s.string({ date: true });
-      expect(() => schema.parse("2023-01-01")).not.toThrow();
+      await expect(schema.parse("2023-01-01")).resolves.toBe("2023-01-01");
     });
 
-    it("should throw an error for an invalid ISO 8601 date string", () => {
+    it("should throw an error for an invalid ISO 8601 date string", async () => {
       const schema = s.string({ date: true });
-      expect(() => schema.parse("2023/01/01")).toThrow();
+      await expect(schema.parse("2023/01/01")).rejects.toThrow();
     });
 
-    it("should validate a non-date string when date is false", () => {
+    it("should validate a non-date string when date is false", async () => {
       const schema = s.string({ date: false });
-      expect(() => schema.parse("2023/01/01")).not.toThrow();
+      await expect(schema.parse("2023/01/01")).resolves.toBe("2023/01/01");
     });
 
-    it("should throw an error for a date string when date is false", () => {
+    it("should throw an error for a date string when date is false", async () => {
       const schema = s.string({ date: false });
-      expect(() => schema.parse("2023-01-01")).toThrow();
+      await expect(schema.parse("2023-01-01")).rejects.toThrow();
     });
   });
 
   describe("time", () => {
-    it("should validate a correct ISO 8601 time string", () => {
+    it("should validate a correct ISO 8601 time string", async () => {
       const schema = s.string({ time: true });
-      expect(() => schema.parse("12:34:56")).not.toThrow();
+      await expect(schema.parse("12:34:56")).resolves.toBe("12:34:56");
     });
 
-    it("should throw an error for an invalid ISO 8601 time string", () => {
+    it("should throw an error for an invalid ISO 8601 time string", async () => {
       const schema = s.string({ time: true });
-      expect(() => schema.parse("12-34-56")).toThrow();
+      await expect(schema.parse("12-34-56")).rejects.toThrow();
     });
 
-    it("should validate a non-time string when time is false", () => {
+    it("should validate a non-time string when time is false", async () => {
       const schema = s.string({ time: false });
-      expect(() => schema.parse("12-34-56")).not.toThrow();
+      await expect(schema.parse("12-34-56")).resolves.toBe("12-34-56");
     });
 
-    it("should throw an error for a time string when time is false", () => {
+    it("should throw an error for a time string when time is false", async () => {
       const schema = s.string({ time: false });
-      expect(() => schema.parse("12:34:56")).toThrow();
+      await expect(schema.parse("12:34:56")).rejects.toThrow();
     });
   });
 
   describe("duration", () => {
-    it("should validate a correct ISO 8601 duration string", () => {
+    it("should validate a correct ISO 8601 duration string", async () => {
       const schema = s.string({ duration: true });
-      expect(() => schema.parse("P3Y6M4DT12H30M5S")).not.toThrow();
+      await expect(schema.parse("P3Y6M4DT12H30M5S")).resolves.toBe(
+        "P3Y6M4DT12H30M5S"
+      );
     });
 
-    it("should throw an error for an invalid ISO 8601 duration string", () => {
+    it("should throw an error for an invalid ISO 8601 duration string", async () => {
       const schema = s.string({ duration: true });
-      expect(() => schema.parse("3Y6M4DT12H30M5S")).toThrow();
+      await expect(schema.parse("3Y6M4DT12H30M5S")).rejects.toThrow();
     });
 
-    it("should validate a non-duration string when duration is false", () => {
+    it("should validate a non-duration string when duration is false", async () => {
       const schema = s.string({ duration: false });
-      expect(() => schema.parse("3Y6M4DT12H30M5S")).not.toThrow();
+      await expect(schema.parse("3Y6M4DT12H30M5S")).resolves.toBe(
+        "3Y6M4DT12H30M5S"
+      );
     });
 
-    it("should throw an error for a duration string when duration is false", () => {
+    it("should throw an error for a duration string when duration is false", async () => {
       const schema = s.string({ duration: false });
-      expect(() => schema.parse("P3Y6M4DT12H30M5S")).toThrow();
+      await expect(schema.parse("P3Y6M4DT12H30M5S")).rejects.toThrow();
     });
   });
 
   describe("hexColor", () => {
-    it("should validate a correct hex color string", () => {
+    it("should validate a correct hex color string", async () => {
       const schema = s.string({ hexColor: true });
-      expect(() => schema.parse("#ff0000")).not.toThrow();
-      expect(() => schema.parse("#f00")).not.toThrow();
+      await expect(schema.parse("#ff0000")).resolves.toBe("#ff0000");
+      await expect(schema.parse("#f00")).resolves.toBe("#f00");
     });
 
-    it("should throw an error for an invalid hex color string", () => {
+    it("should throw an error for an invalid hex color string", async () => {
       const schema = s.string({ hexColor: true });
-      expect(() => schema.parse("#ff000")).toThrow();
+      await expect(schema.parse("#ff000")).rejects.toThrow();
     });
 
-    it("should validate a non-hex color string when hexColor is false", () => {
+    it("should validate a non-hex color string when hexColor is false", async () => {
       const schema = s.string({ hexColor: false });
-      expect(() => schema.parse("#ff000")).not.toThrow();
+      await expect(schema.parse("#ff000")).resolves.toBe("#ff000");
     });
 
-    it("should throw an error for a hex color string when hexColor is false", () => {
+    it("should throw an error for a hex color string when hexColor is false", async () => {
       const schema = s.string({ hexColor: false });
-      expect(() => schema.parse("#ff0000")).toThrow();
+      await expect(schema.parse("#ff0000")).rejects.toThrow();
     });
   });
 
   describe("semver", () => {
-    it("should validate a correct semver string", () => {
+    it("should validate a correct semver string", async () => {
       const schema = s.string({ semver: true });
-      expect(() => schema.parse("1.2.3")).not.toThrow();
-      expect(() => schema.parse("1.2.3-alpha.1")).not.toThrow();
+      await expect(schema.parse("1.2.3")).resolves.toBe("1.2.3");
+      await expect(schema.parse("1.2.3-alpha.1")).resolves.toBe(
+        "1.2.3-alpha.1"
+      );
     });
 
-    it("should throw an error for an invalid semver string", () => {
+    it("should throw an error for an invalid semver string", async () => {
       const schema = s.string({ semver: true });
-      expect(() => schema.parse("1.2")).toThrow();
+      await expect(schema.parse("1.2")).rejects.toThrow();
     });
 
-    it("should validate a non-semver string when semver is false", () => {
+    it("should validate a non-semver string when semver is false", async () => {
       const schema = s.string({ semver: false });
-      expect(() => schema.parse("1.2")).not.toThrow();
+      await expect(schema.parse("1.2")).resolves.toBe("1.2");
     });
 
-    it("should throw an error for a semver string when semver is false", () => {
+    it("should throw an error for a semver string when semver is false", async () => {
       const schema = s.string({ semver: false });
-      expect(() => schema.parse("1.2.3")).toThrow();
+      await expect(schema.parse("1.2.3")).rejects.toThrow();
     });
   });
 
   describe("uuid", () => {
-    it("should validate a correct UUID", () => {
+    it("should validate a correct UUID", async () => {
       const schema = s.string({ uuid: true });
-      expect(() =>
+      await expect(
         schema.parse("f47ac10b-58cc-4372-a567-0e02b2c3d479")
-      ).not.toThrow();
-      expect(() =>
+      ).resolves.toBe("f47ac10b-58cc-4372-a567-0e02b2c3d479");
+      await expect(
         schema.parse("123e4567-e89b-12d3-a456-426614174000")
-      ).not.toThrow();
+      ).resolves.toBe("123e4567-e89b-12d3-a456-426614174000");
     });
 
-    it("should throw an error for an invalid UUID", () => {
+    it("should throw an error for an invalid UUID", async () => {
       const schema = s.string({ uuid: true });
-      expect(() => schema.parse("not-a-uuid")).toThrow();
-      expect(() =>
+      await expect(schema.parse("not-a-uuid")).rejects.toThrow();
+      await expect(
         schema.parse("f47ac10b-58cc-4372-a567-0e02b2c3d479a")
-      ).toThrow();
+      ).rejects.toThrow();
     });
 
-    it("should validate a non-UUID when uuid is false", () => {
+    it("should validate a non-UUID when uuid is false", async () => {
       const schema = s.string({ uuid: false });
-      expect(() => schema.parse("not-a-uuid")).not.toThrow();
+      await expect(schema.parse("not-a-uuid")).resolves.toBe("not-a-uuid");
     });
 
-    it("should throw an error for a UUID when uuid is false", () => {
+    it("should throw an error for a UUID when uuid is false", async () => {
       const schema = s.string({ uuid: false });
-      expect(() =>
+      await expect(
         schema.parse("f47ac10b-58cc-4372-a567-0e02b2c3d479")
-      ).toThrow();
+      ).rejects.toThrow();
     });
   });
 
   describe("datetime", () => {
-    it("should validate a correct ISO 8601 datetime string", () => {
+    it("should validate a correct ISO 8601 datetime string", async () => {
       const schema = s.string({ datetime: true });
-      expect(() => schema.parse("2023-10-27T10:00:00Z")).not.toThrow();
-      expect(() => schema.parse("2023-10-27T10:00:00.123Z")).not.toThrow();
-      expect(() => schema.parse("2023-10-27T10:00:00+05:30")).not.toThrow();
+      await expect(schema.parse("2023-10-27T10:00:00Z")).resolves.toBe(
+        "2023-10-27T10:00:00Z"
+      );
+      await expect(schema.parse("2023-10-27T10:00:00.123Z")).resolves.toBe(
+        "2023-10-27T10:00:00.123Z"
+      );
+      await expect(schema.parse("2023-10-27T10:00:00+05:30")).resolves.toBe(
+        "2023-10-27T10:00:00+05:30"
+      );
     });
 
-    it("should throw an error for an invalid ISO 8601 datetime string", () => {
+    it("should throw an error for an invalid ISO 8601 datetime string", async () => {
       const schema = s.string({ datetime: true });
-      expect(() => schema.parse("2023-10-27 10:00:00")).toThrow();
-      expect(() => schema.parse("not-a-datetime")).toThrow();
+      await expect(schema.parse("2023-10-27 10:00:00")).rejects.toThrow();
+      await expect(schema.parse("not-a-datetime")).rejects.toThrow();
     });
 
-    it("should validate a non-datetime string when datetime is false", () => {
+    it("should validate a non-datetime string when datetime is false", async () => {
       const schema = s.string({ datetime: false });
-      expect(() => schema.parse("2023-10-27 10:00:00")).not.toThrow();
+      await expect(schema.parse("2023-10-27 10:00:00")).resolves.toBe(
+        "2023-10-27 10:00:00"
+      );
     });
 
-    it("should throw an error for a datetime string when datetime is false", () => {
+    it("should throw an error for a datetime string when datetime is false", async () => {
       const schema = s.string({ datetime: false });
-      expect(() => schema.parse("2023-10-27T10:00:00Z")).toThrow();
+      await expect(schema.parse("2023-10-27T10:00:00Z")).rejects.toThrow();
     });
   });
 });

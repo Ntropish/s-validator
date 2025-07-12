@@ -9,7 +9,7 @@ export const objectValidatorMap = {
     identity: (value: unknown): value is object =>
       typeof value === "object" && value !== null && !Array.isArray(value),
 
-    properties: (
+    properties: async (
       value: object,
       [properties]: [Record<string, SchemaLike>],
       context
@@ -27,12 +27,17 @@ export const objectValidatorMap = {
         }
 
         const propertyValue = (value as any)[key];
-        schema.parse({
+        const result = await schema.safeParse({
           ...context,
           path: [...context.path, key],
           value: propertyValue,
         });
+
+        if (result.status === "error") {
+          return false;
+        }
       }
+
       return true;
     },
   } satisfies ValidatorCollection<object>,
