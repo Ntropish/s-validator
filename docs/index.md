@@ -132,6 +132,50 @@ You can create complex data structures by nesting schemas.
 - `s.union()`: Validates that a value matches one of several possible schemas.
 - `s.switch()`: Validates against different schemas based on a key property.
 
+## Type Inference with `s.infer`
+
+`s-val` can automatically infer a static TypeScript type from your schema. This is extremely useful for ensuring that your code remains type-safe after validation, without needing to manually define the types yourself.
+
+To infer the type, use the `s.infer<T>` utility, where `T` is the `typeof` your schema.
+
+```typescript
+import { s } from "s-val";
+
+const userSchema = s.object({
+  properties: {
+    name: s.string(),
+    age: s.number(),
+    isAdmin: s.boolean().optional(),
+    tags: s.array().ofType(s.string()).nullable(),
+  },
+});
+
+// Infer the type from the schema
+type User = s.infer<typeof userSchema>;
+
+// The inferred 'User' type is equivalent to:
+// {
+//   name: string;
+//   age: number;
+//   isAdmin?: boolean | undefined;
+//   tags: string[] | null;
+// }
+
+// You can now use this type in your code
+const processUser = (user: User) => {
+  console.log(user.name);
+};
+
+const validUserData = {
+  name: "Jane Doe",
+  age: 42,
+  tags: null,
+};
+
+const validatedUser = await userSchema.parse(validUserData);
+processUser(validatedUser); // This is type-safe!
+```
+
 ## Next Steps
 
 Now that you have the basics, you can dive deeper into the specific validators or learn how to create your own.
@@ -149,3 +193,32 @@ Now that you have the basics, you can dive deeper into the specific validators o
   - [Switch](./validators/switch.md)
 
 - **[Extensibility](./extensibility.md):** Learn how to create custom validators.
+
+## Advanced Topics
+
+### Interoperability with `StandardSchemaV1`
+
+`s-val` schemas are compatible with the [`StandardSchemaV1` interface](https://github.com/alexreardon/standard-schemas). This allows you to use `s-val` schemas with other libraries and tools that adhere to the same standard.
+
+The compatibility interface is available under the `~standard` property on any schema instance.
+
+```typescript
+import { s } from "s-val";
+import type { StandardSchemaV1 } from "s-val";
+
+const userSchema = s.object({
+  properties: { name: s.string() },
+});
+
+// Access the standard interface
+const standardUserSchema: StandardSchemaV1<any, any> = userSchema["~standard"];
+
+// You can now use this with any tool that expects a StandardSchemaV1
+const result = await standardUserSchema.validate({ name: "John" });
+
+if (!("issues" in result)) {
+  console.log("Success:", result.value);
+} else {
+  console.error("Failure:", result.issues);
+}
+```

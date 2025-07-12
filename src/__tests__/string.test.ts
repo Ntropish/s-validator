@@ -107,33 +107,46 @@ describe("String Validators", () => {
         schema.parse("01H8XGJWBWBAQ4JDB3A4S9A1Z7")
       ).rejects.toThrow();
     });
+  });
 
-    it("should validate a correct ULIDv7", async () => {
-      const schema = s.string({ ulidV7: true });
-      await expect(schema.parse("01H2J3K4M5N6P7R8T9V0A1B2C3")).resolves.toBe(
-        "01H2J3K4M5N6P7R8T9V0A1B2C3"
-      );
-    });
-
-    it("should throw an error for an invalid ULIDv7", async () => {
-      const schema = s.string({ ulidV7: true });
+  describe("uuidV7", () => {
+    it("should validate a correct UUIDv7", async () => {
+      const schema = s.string({ uuidV7: true });
       await expect(
-        schema.parse("81H2J3K4M5N6P7R8T9V0A1B2C3")
-      ).rejects.toThrow(); // Starts with 8
-      await expect(schema.parse("not a ulidv7")).rejects.toThrow();
-    });
+        schema.parse("00000000-0000-7000-8000-000000000000")
+      ).resolves.toBe("00000000-0000-7000-8000-000000000000");
 
-    it("should validate a non-ULIDv7 when ulidV7 is false", async () => {
-      const schema = s.string({ ulidV7: false });
-      await expect(schema.parse("81H2J3K4M5N6P7R8T9V0A1B2C3")).resolves.toBe(
-        "81H2J3K4M5N6P7R8T9V0A1B2C3"
-      );
-    });
-
-    it("should throw an error for a ULIDv7 when ulidV7 is false", async () => {
-      const schema = s.string({ ulidV7: false });
       await expect(
-        schema.parse("01H2J3K4M5N6P7R8T9V0A1B2C3")
+        schema.parse("0197fc50-9d92-7b83-a45f-60be0e29b306")
+      ).resolves.toBe("0197fc50-9d92-7b83-a45f-60be0e29b306");
+
+      await expect(
+        schema.parse("0197fc50-cb31-7865-af3a-6ecc6ab2aeb7")
+      ).resolves.toBe("0197fc50-cb31-7865-af3a-6ecc6ab2aeb7");
+    });
+
+    it("should throw an error for an invalid UUIDv7", async () => {
+      const schema = s.string({ uuidV7: true });
+      // Invalid version (should be 7)
+      await expect(
+        schema.parse("00000000-0000-4000-8000-000000000000")
+      ).rejects.toThrow();
+      // Invalid variant (should be 8, 9, a, or b)
+      await expect(
+        schema.parse("00000000-0000-7000-c000-000000000000")
+      ).rejects.toThrow();
+      await expect(schema.parse("not a uuidv7")).rejects.toThrow();
+    });
+
+    it("should validate a non-UUIDv7 when uuidV7 is false", async () => {
+      const schema = s.string({ uuidV7: false });
+      await expect(schema.parse("not a uuidv7")).resolves.toBe("not a uuidv7");
+    });
+
+    it("should throw an error for a UUIDv7 when uuidV7 is false", async () => {
+      const schema = s.string({ uuidV7: false });
+      await expect(
+        schema.parse("00000000-0000-7000-8000-000000000000")
       ).rejects.toThrow();
     });
   });

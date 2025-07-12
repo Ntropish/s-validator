@@ -97,6 +97,7 @@ These validators check for common string formats. They are all enabled by passin
 | ----------- | ---------------------------------- |
 | `url`       | A valid URL.                       |
 | `uuid`      | A valid UUID.                      |
+| `uuidV7`    | A valid UUID v7.                   |
 | `cuid`      | A valid CUID.                      |
 | `cuid2`     | A valid CUID2.                     |
 | `ulid`      | A valid ULID.                      |

@@ -30,9 +30,7 @@ export const stringValidatorMap = {
     ulid: (value: string, [enabled = true]: [boolean?]) => {
       return enabled ? regex.ulid.test(value) : !regex.ulid.test(value);
     },
-    ulidV7: (value: string, [enabled = true]: [boolean?]) => {
-      return enabled ? regex.ulidV7.test(value) : !regex.ulidV7.test(value);
-    },
+
     emoji: (value: string, [enabled]: [boolean?]) => {
       if (enabled === undefined) return true;
       return enabled ? regex.emoji.test(value) : !regex.emoji.test(value);
@@ -91,6 +89,9 @@ export const stringValidatorMap = {
     uuid: (value: string, [enabled]: [boolean?]) => {
       if (enabled === undefined) return true;
       return enabled ? regex.uuid.test(value) : !regex.uuid.test(value);
+    },
+    uuidV7: (value: string, [enabled = true]: [boolean?]) => {
+      return enabled ? regex.uuidV7.test(value) : !regex.uuidV7.test(value);
     },
     datetime: (value: string, [enabled]: [boolean?]) => {
       if (enabled === undefined) return true;

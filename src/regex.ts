@@ -14,5 +14,6 @@ export const regex = {
    * @see https://github.com/ulid/spec
    * @see https://github.com/fpotter/ulid-v7
    */
-  ulidV7: /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/,
+  uuidV7:
+    /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
 };
