@@ -518,9 +518,10 @@ class ObjectSchema<
       if (Object.prototype.hasOwnProperty.call(newValue, key)) {
         const propertySchema = shape[key];
         newValue[key] = await propertySchema._prepare({
-          ...context,
-          value: newValue[key],
+          rootData: context.rootData,
           path: [...context.path, key],
+          value: newValue[key],
+          ctx: context.ctx,
         });
       }
     }
@@ -551,7 +552,12 @@ class ObjectSchema<
     const propertyPromises = Object.keys(shape).map(async (key) => {
       const propertySchema = shape[key];
       const propertyValue = value[key];
-      const newContext = { ...context, path: [...context.path, key] };
+      const newContext = {
+        rootData: context.rootData,
+        path: [...context.path, key],
+        value: propertyValue,
+        ctx: context.ctx,
+      };
 
       try {
         if (Object.prototype.hasOwnProperty.call(value, key)) {
@@ -655,9 +661,10 @@ class ObjectSchema<
       if (Object.prototype.hasOwnProperty.call(newValue, key)) {
         const propertySchema = shape[key];
         newValue[key] = await propertySchema._transform(newValue[key], {
-          ...context,
-          value: newValue[key],
+          rootData: context.rootData,
           path: [...context.path, key],
+          value: newValue[key],
+          ctx: context.ctx,
         });
       }
     });
@@ -770,9 +777,10 @@ class ArraySchema<
     for (let i = 0; i < preparedValue.length; i++) {
       const item = preparedValue[i];
       const preparedItem = await this.itemSchema._prepare({
-        ...context,
-        value: item,
+        rootData: context.rootData,
         path: [...context.path, i],
+        value: item,
+        ctx: context.ctx,
       });
       preparedArray.push(preparedItem);
     }
@@ -794,7 +802,12 @@ class ArraySchema<
     const newArray: any[] = [];
 
     const itemPromises = value.map(async (item, i) => {
-      const newContext = { ...context, path: [...context.path, i] };
+      const newContext = {
+        rootData: context.rootData,
+        path: [...context.path, i],
+        value: item,
+        ctx: context.ctx,
+      };
       try {
         const validatedItem = await this.itemSchema._validate(item, newContext);
         newArray[i] = validatedItem;
@@ -830,9 +843,10 @@ class ArraySchema<
 
     const itemPromises = transformedValue.map(async (item, i) => {
       newArray[i] = await this.itemSchema._transform(item, {
-        ...context,
-        value: item,
+        rootData: context.rootData,
         path: [...context.path, i],
+        value: item,
+        ctx: context.ctx,
       });
     });
 
@@ -846,30 +860,42 @@ class SwitchSchema extends Schema<any> {
     super("switch", config);
   }
 
-  async _validate(value: any, context: ValidationContext): Promise<any> {
+  private selectCase(context: ValidationContext): Schema<any, any> | undefined {
     const {
       select,
       cases,
       default: defaultSchema,
-      failOnNoMatch,
     } = this.config as SwitchConfig;
 
     if (!select || !cases) {
-      return value;
+      return undefined;
     }
 
-    const key = select({ ...context, value });
-    const caseSchema = cases[key] || defaultSchema;
+    const key = select(context);
+    return cases[key] || defaultSchema;
+  }
+
+  async _prepare(context: ValidationContext): Promise<any> {
+    const preparedValue = await super._prepare(context);
+    const caseSchema = this.selectCase({ ...context, value: preparedValue });
 
     if (caseSchema) {
-      const result = await caseSchema.safeParse(value, context);
-      if (result.status === "error") {
-        throw result.error;
-      }
-      return result.data;
+      return await caseSchema._prepare({ ...context, value: preparedValue });
     }
 
+    return preparedValue;
+  }
+
+  async _validate(value: any, context: ValidationContext): Promise<any> {
+    const caseSchema = this.selectCase(context);
+
+    if (caseSchema) {
+      return await caseSchema._validate(value, context);
+    }
+
+    const { failOnNoMatch } = this.config as SwitchConfig;
     if (failOnNoMatch) {
+      const key = (this.config as SwitchConfig).select(context);
       throw new ValidationError([
         {
           path: context.path,
@@ -879,6 +905,17 @@ class SwitchSchema extends Schema<any> {
     }
 
     return value;
+  }
+
+  async _transform(value: any, context: ValidationContext): Promise<any> {
+    const transformedValue = await super._transform(value, context);
+    const caseSchema = this.selectCase({ ...context, value: transformedValue });
+
+    if (caseSchema) {
+      return await caseSchema._transform(transformedValue, context);
+    }
+
+    return transformedValue;
   }
 }
 

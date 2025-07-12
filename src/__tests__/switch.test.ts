@@ -64,10 +64,9 @@ describe("Switch Validator", () => {
       await expect(schema.parse(data as any)).resolves.toEqual(data);
     });
 
-    it.only("should handle nested switch statements correctly", async () => {
+    it("should handle nested switch statements correctly", async () => {
       const nestedSchema: Schema<any> = s.switch({
         select: (c) => {
-          console.log(c);
           return c.rootData.nestedKey;
         },
         cases: {
