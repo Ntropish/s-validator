@@ -34,6 +34,24 @@ export const numberPlugin: Plugin = {
           validator: (value: number, [max]: [number]) => value <= max,
           message: (ctx) => `${ctx.label} must be at most ${ctx.args[0]}.`,
         },
+        gt: {
+          validator: (value: number, [num]: [number]) => value > num,
+          message: (ctx) => `${ctx.label} must be greater than ${ctx.args[0]}.`,
+        },
+        gte: {
+          validator: (value: number, [num]: [number]) => value >= num,
+          message: (ctx) =>
+            `${ctx.label} must be greater than or equal to ${ctx.args[0]}.`,
+        },
+        lt: {
+          validator: (value: number, [num]: [number]) => value < num,
+          message: (ctx) => `${ctx.label} must be less than ${ctx.args[0]}.`,
+        },
+        lte: {
+          validator: (value: number, [num]: [number]) => value <= num,
+          message: (ctx) =>
+            `${ctx.label} must be less than or equal to ${ctx.args[0]}.`,
+        },
         range: {
           validator: (value: number, [[min, max]]: [[number, number]]) =>
             value >= min && value <= max,
@@ -45,6 +63,12 @@ export const numberPlugin: Plugin = {
             value > min && value < max,
           message: (ctx) =>
             `${ctx.label} must be strictly between ${ctx.args[0][0]} and ${ctx.args[0][1]}.`,
+        },
+        multipleOf: {
+          validator: (value: number, [multipleOf]: [number]) =>
+            value % multipleOf === 0,
+          message: (ctx) =>
+            `${ctx.label} must be a multiple of ${ctx.args[0]}.`,
         },
         integer: {
           validator: (value: number, [enabled]: [boolean?]) => {
@@ -70,6 +94,14 @@ export const numberPlugin: Plugin = {
               : !Number.isSafeInteger(value);
           },
           message: (ctx) => `${ctx.label} must be a safe integer.`,
+        },
+        positive: {
+          validator: (value: number) => value > 0,
+          message: (ctx) => `${ctx.label} must be positive.`,
+        },
+        negative: {
+          validator: (value: number) => value < 0,
+          message: (ctx) => `${ctx.label} must be negative.`,
         },
       },
     },

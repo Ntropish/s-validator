@@ -1,4 +1,4 @@
-import { Plugin } from "./validators/types.js";
+import { Plugin, SchemaValidatorMap } from "./validators/types.js";
 import { anyPlugin } from "./validators/any.js";
 import { arrayPlugin } from "./validators/array.js";
 import { bigintPlugin } from "./validators/bigint.js";
@@ -32,10 +32,10 @@ const plugins: Plugin[] = [
 ];
 
 function mergePlugins(plugins: Plugin[]) {
-  const validatorMap = {};
-  const preparationMap = {};
-  const transformationMap = {};
-  const messageMap = {};
+  const validatorMap: SchemaValidatorMap = {};
+  const preparationMap: Record<string, any> = {};
+  const transformationMap: Record<string, any> = {};
+  const messageMap: Record<string, any> = {};
 
   for (const plugin of plugins) {
     for (const dataType in plugin) {

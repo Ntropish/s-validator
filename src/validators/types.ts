@@ -26,6 +26,7 @@ export interface MessageProducerContext {
   args: any[];
   dataType: string;
   ctx?: any;
+  schema: Schema<any, any>;
 }
 
 export type MessageProducer = (context: MessageProducerContext) => string;

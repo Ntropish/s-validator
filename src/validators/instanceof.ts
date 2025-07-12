@@ -5,10 +5,23 @@ export const instanceofPlugin: Plugin = {
     {
       validate: {
         identity: {
-          validator: (value: unknown): value is object =>
-            typeof value === "object",
-          message: (ctx) =>
-            `Invalid type. Expected object, received ${typeof ctx.value}.`,
+          validator: (
+            value: unknown,
+            args,
+            context,
+            schema
+          ): value is object => {
+            const constructorFn = (schema as any).constructorFn;
+            if (!constructorFn) {
+              return false;
+            }
+            return value instanceof constructorFn;
+          },
+          message: (ctx) => {
+            const constructorName =
+              (ctx.schema as any).constructorFn?.name || "Unknown";
+            return `Value must be an instance of ${constructorName}.`;
+          },
         },
       },
     },

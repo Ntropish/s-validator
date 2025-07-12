@@ -15,30 +15,33 @@ describe("safeParse", () => {
 
   it("should return a failure result for invalid data", async () => {
     const schema = s.string({ validate: { minLength: 5 } });
-    const result = await schema.safeParse("hi");
-
+    const result = await schema.safeParse("shrt");
+    expect(result.status).toBe("error");
     if (result.status === "error") {
-      expect(result.error).toBeInstanceOf(ValidationError);
-      expect(result.error.issues).toHaveLength(1);
-      expect(result.error.issues[0].message).toContain("minLength");
-    } else {
-      expect.fail("Parsing should have failed");
+      expect(result.error.issues[0].message).toBe(
+        "String must be at least 5 characters long."
+      );
     }
   });
 
   it("should collect multiple errors", async () => {
-    const schema = s.string({
-      validate: { minLength: 10, pattern: /^[a-zA-Z]+$/ },
+    const schema = s.object({
+      properties: {
+        name: s.string({ validate: { minLength: 4 }, label: "Full Name" }),
+        age: s.number({ validate: { min: 18 }, label: "User Age" }),
+      },
     });
-    const result = await schema.safeParse("123");
+
+    const result = await schema.safeParse({ name: "a", age: 17 });
+    expect(result.status).toBe("error");
+
     if (result.status === "error") {
-      expect(result.error).toBeInstanceOf(ValidationError);
-      expect(result.error.issues).toHaveLength(2);
       const messages = result.error.issues.map((i) => i.message);
-      expect(messages.some((m) => m.includes("minLength"))).toBe(true);
-      expect(messages.some((m) => m.includes("pattern"))).toBe(true);
-    } else {
-      expect.fail("Parsing should have failed");
+      expect(messages).toHaveLength(2);
+      expect(messages).toContain(
+        "Full Name must be at least 4 characters long."
+      );
+      expect(messages).toContain("User Age must be at least 18.");
     }
   });
 

@@ -289,6 +289,7 @@ export class Schema<TOutput, TInput = TOutput>
           dataType: this.dataType,
           ctx: context.ctx,
           args,
+          schema: this,
         };
 
         let message: string | undefined;
@@ -341,6 +342,7 @@ export class Schema<TOutput, TInput = TOutput>
               dataType: this.dataType,
               ctx: context.ctx,
               args: [], // Custom validators don't have 'args' in the same way
+              schema: this,
             });
           }
         }
@@ -1325,16 +1327,6 @@ class InstanceOfSchema<T extends new (...args: any) => any> extends Schema<
     context: ValidationContext
   ): Promise<void> {
     await super._validate(value, context);
-    if (value === undefined || value === null) return;
-
-    if (!(value instanceof this.constructorFn)) {
-      throw new ValidationError([
-        {
-          path: context.path,
-          message: `Invalid type. Expected instanceof ${this.constructorFn.name}.`,
-        },
-      ]);
-    }
   }
 
   public optional(): Schema<InstanceType<T> | undefined> {
