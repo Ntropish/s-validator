@@ -73,6 +73,7 @@ Validators are grouped by category.
 - [Array](./array.md)
 - [Map](./map.md)
 - [Object](./object.md)
+- [Record](./record.md)
 - [Set](./set.md)
 
 ### Composition & Logic

@@ -364,6 +364,62 @@ class ObjectSchema<
   }
 }
 
+class RecordSchema<
+  K extends Schema<string | number>,
+  V extends Schema<any>
+> extends Schema<Record<s.infer<K>, s.infer<V>>> {
+  private keySchema: K;
+  private valueSchema: V;
+
+  constructor(keySchema: K, valueSchema: V) {
+    super("record", {}, validatorMap);
+    this.keySchema = keySchema;
+    this.valueSchema = valueSchema;
+  }
+
+  protected async _parse(
+    context: ValidationContext
+  ): Promise<Record<s.infer<K>, s.infer<V>>> {
+    if (
+      typeof context.value !== "object" ||
+      context.value === null ||
+      Array.isArray(context.value)
+    ) {
+      throw new ValidationError([
+        { path: context.path, message: "Invalid type. Expected an object." },
+      ]);
+    }
+
+    const newRecord: Record<any, any> = {};
+
+    for (const [key, value] of Object.entries(context.value)) {
+      const keyResult = await this.keySchema.safeParse({
+        ...context,
+        path: [...context.path, key, "key"],
+        value: key,
+      });
+
+      if (keyResult.status === "error") {
+        throw keyResult.error;
+      }
+
+      const valueResult = await this.valueSchema.safeParse({
+        ...context,
+        path: [...context.path, key, "value"],
+        value: value,
+      });
+
+      if (valueResult.status === "error") {
+        throw valueResult.error;
+      }
+
+      newRecord[keyResult.data] = valueResult.data;
+    }
+
+    return newRecord;
+  }
+}
+
 type SwitchCase<T> = Record<string | number, Schema<T>>;
 type SwitchDefault<T> = Schema<T> | undefined;
 
@@ -574,6 +630,10 @@ type CreateSchemaBuilder<TMap extends SchemaValidatorMap> = {
     schemas: TCases,
     defaultSchema?: TDefault
   ): SwitchSchema<TKey, TCases, TDefault>;
+  record<K extends Schema<string | number>, V extends Schema<any>>(
+    keySchema: K,
+    valueSchema: V
+  ): RecordSchema<K, V>;
   union<T extends [Schema<any>, ...Schema<any>[]]>(schemas: T): UnionSchema<T>;
   literal<T extends string | number | boolean | null | undefined>(
     literal: T
@@ -627,6 +687,13 @@ export function createSchemaBuilder<TMap extends SchemaValidatorMap>(
       return new ObjectSchema<P, InferSObjectType<P>>(config);
     }
     return new ObjectSchema<P, WithLoose<InferSObjectType<P>>>(config);
+  };
+
+  builder.record = function <
+    K extends Schema<string | number>,
+    V extends Schema<any>
+  >(keySchema: K, valueSchema: V) {
+    return new RecordSchema(keySchema, valueSchema);
   };
 
   builder.switch = function <
