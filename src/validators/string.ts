@@ -139,14 +139,14 @@ export const stringValidatorMap = {
         ? regex.isoDateTime.test(value)
         : !regex.isoDateTime.test(value);
     },
-    json: async (value: string, [schema]: [SchemaLike], context) => {
+    json: async (value: string, [schema]: [SchemaLike]) => {
       let parsed: any;
       try {
         parsed = JSON.parse(value);
       } catch (e) {
         return false;
       }
-      const result = await schema.safeParse({ ...context, value: parsed });
+      const result = await schema.safeParse(parsed);
       return result.status === "success";
     },
     email: (
