@@ -345,3 +345,9 @@ export function createSchemaBuilder<TMap extends SchemaValidatorMap>(
 }
 
 export const s = createSchemaBuilder(validatorMap);
+
+export namespace s {
+  export type infer<T extends Schema<any>> = T extends Schema<infer U>
+    ? U
+    : never;
+}

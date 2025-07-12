@@ -107,6 +107,35 @@ describe("String Validators", () => {
         schema.parse("01H8XGJWBWBAQ4JDB3A4S9A1Z7")
       ).rejects.toThrow();
     });
+
+    it("should validate a correct ULIDv7", async () => {
+      const schema = s.string({ ulidV7: true });
+      await expect(schema.parse("01H2J3K4M5N6P7R8T9V0A1B2C3")).resolves.toBe(
+        "01H2J3K4M5N6P7R8T9V0A1B2C3"
+      );
+    });
+
+    it("should throw an error for an invalid ULIDv7", async () => {
+      const schema = s.string({ ulidV7: true });
+      await expect(
+        schema.parse("81H2J3K4M5N6P7R8T9V0A1B2C3")
+      ).rejects.toThrow(); // Starts with 8
+      await expect(schema.parse("not a ulidv7")).rejects.toThrow();
+    });
+
+    it("should validate a non-ULIDv7 when ulidV7 is false", async () => {
+      const schema = s.string({ ulidV7: false });
+      await expect(schema.parse("81H2J3K4M5N6P7R8T9V0A1B2C3")).resolves.toBe(
+        "81H2J3K4M5N6P7R8T9V0A1B2C3"
+      );
+    });
+
+    it("should throw an error for a ULIDv7 when ulidV7 is false", async () => {
+      const schema = s.string({ ulidV7: false });
+      await expect(
+        schema.parse("01H2J3K4M5N6P7R8T9V0A1B2C3")
+      ).rejects.toThrow();
+    });
   });
 
   describe("emoji", () => {

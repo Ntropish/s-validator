@@ -27,9 +27,11 @@ export const stringValidatorMap = {
       if (enabled === undefined) return true;
       return enabled ? regex.cuid2.test(value) : !regex.cuid2.test(value);
     },
-    ulid: (value: string, [enabled]: [boolean?]) => {
-      if (enabled === undefined) return true;
+    ulid: (value: string, [enabled = true]: [boolean?]) => {
       return enabled ? regex.ulid.test(value) : !regex.ulid.test(value);
+    },
+    ulidV7: (value: string, [enabled = true]: [boolean?]) => {
+      return enabled ? regex.ulidV7.test(value) : !regex.ulidV7.test(value);
     },
     emoji: (value: string, [enabled]: [boolean?]) => {
       if (enabled === undefined) return true;
