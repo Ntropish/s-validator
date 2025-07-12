@@ -122,10 +122,10 @@ export class Schema<T> {
 
     try {
       const data = this._parse(context);
-      return { success: true, data }; // ⬅ no cast needed
+      return { status: "success", data };
     } catch (e) {
       if (e instanceof ValidationError) {
-        return { success: false, error: e }; // ⬅ no cast needed
+        return { status: "error", error: e };
       }
       throw e;
     }

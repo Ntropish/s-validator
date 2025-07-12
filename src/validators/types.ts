@@ -51,12 +51,12 @@ export class ValidationError extends Error {
 }
 
 export type SafeParseSuccess<T> = {
-  success: true;
+  status: "success";
   data: T;
 };
 
 export type SafeParseError = {
-  success: false;
+  status: "error";
   error: ValidationError;
 };
 
