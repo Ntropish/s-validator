@@ -25,6 +25,18 @@ export const stringPreparations = {
     }
     return String(value);
   },
+  trim: (value: unknown, [enabled]: [boolean?]) => {
+    if (enabled === false) {
+      return value;
+    }
+    return typeof value === "string" ? value.trim() : value;
+  },
+  toLowerCase: (value: unknown, [enabled]: [boolean?]) => {
+    if (enabled === false) {
+      return value;
+    }
+    return typeof value === "string" ? value.toLowerCase() : value;
+  },
 } satisfies PreparationCollection<string>;
 
 export const stringTransformations = {

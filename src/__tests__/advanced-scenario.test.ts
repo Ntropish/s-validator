@@ -21,7 +21,7 @@ describe("Advanced Scenario", () => {
 
       // Email with coercion and validation
       email: s.string({
-        transform: {
+        prepare: {
           trim: true,
           toLowerCase: true,
         },

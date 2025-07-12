@@ -233,50 +233,9 @@ export class Schema<TOutput, TInput = TOutput>
     };
   }
 
-  public async parse(data: TInput): Promise<TOutput>;
-  public async parse(context: ValidationContext): Promise<TOutput>;
-  public async parse(
-    dataOrContext: TInput | ValidationContext
-  ): Promise<TOutput> {
-    const context: ValidationContext = isValidationContext(dataOrContext)
-      ? dataOrContext
-      : {
-          rootData: dataOrContext,
-          path: [],
-          value: dataOrContext,
-        };
-
-    return this._parse(context);
-  }
-
-  public async safeParse(data: TInput): Promise<SafeParseResult<TOutput>>;
-  public async safeParse(
-    context: ValidationContext
-  ): Promise<SafeParseResult<TOutput>>;
-  public async safeParse(
-    dataOrContext: TInput | ValidationContext
-  ): Promise<SafeParseResult<TOutput>> {
-    const context: ValidationContext = isValidationContext(dataOrContext)
-      ? dataOrContext
-      : {
-          rootData: dataOrContext,
-          path: [],
-          value: dataOrContext,
-        };
-    try {
-      const data = await this._parse(context);
-      return { status: "success", data };
-    } catch (e) {
-      if (e instanceof ValidationError) {
-        return { status: "error", error: e };
-      }
-      throw e;
-    }
-  }
-
-  public async _parse(context: ValidationContext): Promise<TOutput> {
-    // Run preparations
+  public async _prepare(context: ValidationContext): Promise<any> {
     let current_value: any = context.value;
+    // Preparations
     for (const { preparation, args } of this.preparations) {
       current_value = await preparation(
         current_value,
@@ -293,47 +252,34 @@ export class Schema<TOutput, TInput = TOutput>
         this
       );
     }
+    return current_value;
+  }
 
-    // Optional/nullable checks
-    if (this.config.optional && current_value === undefined) {
-      return undefined as TOutput;
-    }
-    if (this.config.nullable && current_value === null) {
-      return null as TOutput;
-    }
-
+  public async _validate(
+    value: any,
+    context: ValidationContext
+  ): Promise<void> {
     const issues: ValidationIssue[] = [];
     const messages = (this.config as ValidatorConfig<any>).messages ?? {};
+    const current_value = value;
 
-    // Identity validation first
-    const identityValidator = this.validators.find(
-      (v) => v.name === "identity"
-    );
-    if (
-      identityValidator &&
-      !(await identityValidator.validator(
-        current_value,
-        identityValidator.args,
-        context,
-        this
-      ))
-    ) {
-      issues.push({
-        path: context.path,
-        message:
-          messages.identity ??
-          `Invalid type. Expected ${
-            this.dataType
-          }, received ${typeof current_value}.`,
-      });
-      // If identity fails, no point in running other validators
-      throw new ValidationError(issues);
-    }
+    // Optional/nullable checks must happen on the prepared value
+    if (this.config.optional && current_value === undefined) return;
+    if (this.config.nullable && current_value === null) return;
 
-    // Other validations
+    // All validations
     for (const { name, validator, args } of this.validators) {
-      if (name === "identity") continue;
       if (!(await validator(current_value, args, context, this))) {
+        if (name === "identity") {
+          issues.push({
+            path: context.path,
+            message: `Invalid type. Expected ${
+              this.dataType
+            }, received ${typeof current_value}.`,
+          });
+          // For identity, we can stop further validation on this schema
+          break;
+        }
         issues.push({
           path: context.path,
           message:
@@ -342,7 +288,6 @@ export class Schema<TOutput, TInput = TOutput>
       }
     }
 
-    // Custom validations
     for (const customValidator of this.customValidators) {
       const result =
         typeof customValidator === "function"
@@ -368,8 +313,14 @@ export class Schema<TOutput, TInput = TOutput>
     if (issues.length > 0) {
       throw new ValidationError(issues);
     }
+  }
 
-    // Run transformations
+  public async _transform(
+    value: any,
+    context: ValidationContext
+  ): Promise<TOutput> {
+    let current_value = value;
+    // Transformations
     for (const { transformation, args } of this.transformations) {
       current_value = await transformation(
         current_value,
@@ -386,8 +337,54 @@ export class Schema<TOutput, TInput = TOutput>
         this
       );
     }
-
     return current_value;
+  }
+
+  public async parse(data: TInput): Promise<TOutput>;
+  public async parse(context: ValidationContext): Promise<TOutput>;
+  public async parse(
+    dataOrContext: TInput | ValidationContext
+  ): Promise<TOutput> {
+    const context: ValidationContext = isValidationContext(dataOrContext)
+      ? dataOrContext
+      : {
+          rootData: dataOrContext,
+          path: [],
+          value: dataOrContext,
+        };
+
+    const preparedValue = await this._prepare(context);
+    await this._validate(preparedValue, { ...context, value: preparedValue });
+    const transformedValue = await this._transform(preparedValue, {
+      ...context,
+      value: preparedValue,
+    });
+    return transformedValue;
+  }
+
+  public async safeParse(data: TInput): Promise<SafeParseResult<TOutput>>;
+  public async safeParse(
+    context: ValidationContext
+  ): Promise<SafeParseResult<TOutput>>;
+  public async safeParse(
+    dataOrContext: TInput | ValidationContext
+  ): Promise<SafeParseResult<TOutput>> {
+    const context: ValidationContext = isValidationContext(dataOrContext)
+      ? dataOrContext
+      : {
+          rootData: dataOrContext,
+          path: [],
+          value: dataOrContext,
+        };
+    try {
+      const data = await this.parse(context);
+      return { status: "success", data };
+    } catch (e) {
+      if (e instanceof ValidationError) {
+        return { status: "error", error: e };
+      }
+      throw e;
+    }
   }
 
   public optional(): Schema<TOutput | undefined, TInput | undefined> {
@@ -419,125 +416,79 @@ class ObjectSchema<
     super("object", config, validatorMap, preparationMap, transformationMap);
   }
 
-  public async _parse(context: ValidationContext): Promise<T> {
-    // Run preparations on the object itself.
-    let current_value: any = context.value;
-    for (const { preparation, args } of this.preparations) {
-      current_value = await preparation(
-        current_value,
-        args,
-        { ...context, value: current_value },
-        this
-      );
-    }
-    for (const customPreparation of this.customPreparations) {
-      current_value = await customPreparation(
-        current_value,
-        [],
-        { ...context, value: current_value },
-        this
-      );
+  public async _prepare(context: ValidationContext): Promise<any> {
+    let preparedObject = await super._prepare(context);
+
+    // Nullable/optional checks on the object itself first
+    if (preparedObject === undefined || preparedObject === null) {
+      return preparedObject;
     }
 
-    // Optional/nullable checks
-    if (this.config.optional && current_value === undefined) {
-      return undefined as T;
-    }
-    if (this.config.nullable && current_value === null) {
-      return null as T;
-    }
+    const properties = (this.config as SObjectOptions<P>).properties;
+    const newObject: Record<string, any> = { ...preparedObject };
 
-    // Identity check
-    if (
-      typeof current_value !== "object" ||
-      current_value === null ||
-      Array.isArray(current_value)
-    ) {
-      throw new ValidationError([
-        {
-          path: context.path,
-          message: `Invalid type. Expected object, received ${typeof current_value}.`,
-        },
-      ]);
+    for (const key in properties) {
+      if (Object.prototype.hasOwnProperty.call(newObject, key)) {
+        const schema = properties[key];
+        const value = newObject[key];
+        const childContext = {
+          ...context,
+          path: [...context.path, key],
+          value: value,
+        };
+        newObject[key] = await schema._prepare(childContext);
+      }
     }
+    return newObject;
+  }
 
-    // Property-level parsing
+  public async _validate(
+    value: any,
+    context: ValidationContext
+  ): Promise<void> {
+    // First, run object-level identity checks and optional/nullable
+    await super._validate(value, context);
+
     const properties = (this.config as SObjectOptions<P>).properties;
     const isStrict = (this.config as SObjectOptions<P>).strict;
-    const newObject: Record<string, any> = {};
     const issues: ValidationIssue[] = [];
 
     const allKeys = new Set([
-      ...Object.keys(current_value),
+      ...Object.keys(value),
       ...Object.keys(properties),
     ]);
 
     for (const key of allKeys) {
       const schema = properties[key];
-      const valueExists = Object.prototype.hasOwnProperty.call(
-        current_value,
-        key
-      );
+      const propertyValue = value[key];
+      const childContext = {
+        ...context,
+        path: [...context.path, key],
+        value: propertyValue,
+      };
 
       if (schema) {
         try {
-          const parsedValue = await (schema as any).parse({
-            ...context,
-            path: [...context.path, key],
-            value: current_value[key],
-          });
-          if (
-            parsedValue === undefined &&
-            !(schema.config as any).optional &&
-            !Object.prototype.hasOwnProperty.call(current_value, key)
-          ) {
-            issues.push({
-              path: [...context.path, key],
-              message: "Required property is missing",
-            });
-            continue;
-          }
-
-          if (parsedValue !== undefined) {
-            newObject[key] = parsedValue;
-          }
+          await schema._validate(propertyValue, childContext);
         } catch (e) {
-          if (e instanceof ValidationError) {
-            issues.push(...e.issues);
-          } else {
-            throw e;
-          }
+          if (e instanceof ValidationError) issues.push(...e.issues);
+          else throw e;
         }
-      } else if (valueExists) {
-        if (isStrict) {
-          issues.push({
-            path: [...context.path, key],
-            message: `Unrecognized key: '${key}'`,
-          });
-        } else {
-          newObject[key] = current_value[key];
-        }
+      } else if (isStrict && Object.prototype.hasOwnProperty.call(value, key)) {
+        issues.push({
+          path: childContext.path,
+          message: `Unrecognized key: '${key}'`,
+        });
       }
     }
 
-    if (issues.length > 0) {
-      throw new ValidationError(issues);
-    }
-
-    let finalValue = newObject;
-
-    // Object-level custom validation
+    // Now run object-level custom validators AFTER property-level validation
     for (const customValidator of this.customValidators) {
       const result =
         typeof customValidator === "function"
-          ? await customValidator(finalValue as any, {
-              ...context,
-              value: finalValue as any,
-            })
-          : await customValidator.validator(finalValue as any, {
-              ...context,
-              value: finalValue as any,
-            });
+          ? await customValidator(value, { ...context, value })
+          : await customValidator.validator(value, { ...context, value });
+
       if (!result) {
         const message =
           typeof customValidator === "object"
@@ -545,34 +496,41 @@ class ObjectSchema<
             : "Custom validation failed";
         issues.push({
           path: context.path,
-          message: message || "Custom validation failed",
+          message: message || "Custom validation failed for object",
         });
       }
     }
 
-    if (issues.length > 0) {
-      throw new ValidationError(issues);
+    if (issues.length > 0) throw new ValidationError(issues);
+  }
+
+  public async _transform(value: any, context: ValidationContext): Promise<T> {
+    if (value === undefined || value === null) return value;
+
+    const properties = (this.config as SObjectOptions<P>).properties;
+    const transformedObject: Record<string, any> = { ...value };
+
+    for (const key in properties) {
+      if (Object.prototype.hasOwnProperty.call(transformedObject, key)) {
+        const schema = properties[key];
+        const propertyValue = transformedObject[key];
+        const childContext = {
+          ...context,
+          path: [...context.path, key],
+          value: propertyValue,
+        };
+        transformedObject[key] = await schema._transform(
+          propertyValue,
+          childContext
+        );
+      }
     }
 
-    // Object-level transformations
-    for (const { transformation, args } of this.transformations) {
-      finalValue = await transformation(
-        finalValue,
-        args,
-        { ...context, value: finalValue as any },
-        this
-      );
-    }
-    for (const customTransformation of this.customTransformations) {
-      finalValue = await customTransformation(
-        finalValue,
-        [],
-        { ...context, value: finalValue as any },
-        this
-      );
-    }
-
-    return finalValue as T;
+    // Finally, run object-level transformations
+    return await super._transform(transformedObject, {
+      ...context,
+      value: transformedObject,
+    });
   }
 
   public partial(): ObjectSchema<P> {
@@ -675,149 +633,162 @@ class ArraySchema<T extends Schema<any, any>> extends Schema<
     }
   }
 
-  public async _parse(context: ValidationContext): Promise<Array<s.infer<T>>> {
-    let current_value: any = context.value;
+  public async _prepare(context: ValidationContext): Promise<any> {
+    let preparedValue = await super._prepare(context);
 
-    // Run array-level preparations
-    for (const { preparation, args } of this.preparations) {
-      current_value = await preparation(
-        current_value,
-        args,
-        { ...context, value: current_value },
-        this
-      );
-    }
-    for (const customPreparation of this.customPreparations) {
-      current_value = await customPreparation(
-        current_value,
-        [],
-        { ...context, value: current_value },
-        this
-      );
+    if (
+      preparedValue === undefined ||
+      preparedValue === null ||
+      !Array.isArray(preparedValue)
+    ) {
+      return preparedValue;
     }
 
-    if (this.config.optional && current_value === undefined) {
-      return undefined as any;
+    const preparedArray: any[] = [];
+    for (let i = 0; i < preparedValue.length; i++) {
+      const item = preparedValue[i];
+      const childContext = {
+        ...context,
+        value: item,
+        path: [...context.path, i],
+      };
+      preparedArray.push(await this.itemSchema._prepare(childContext));
     }
-    if (this.config.nullable && current_value === null) {
-      return null as any;
-    }
+    return preparedArray;
+  }
 
-    if (!Array.isArray(current_value)) {
+  public async _validate(
+    value: any,
+    context: ValidationContext
+  ): Promise<void> {
+    await super._validate(value, context);
+    if (value === undefined || value === null) return;
+
+    if (!Array.isArray(value)) {
       throw new ValidationError([
         {
           path: context.path,
-          message: `Invalid type. Expected array, received ${typeof current_value}.`,
+          message: `Invalid type. Expected array, received ${typeof value}.`,
         },
       ]);
     }
 
-    // Item-level parsing and validation
-    const newArray: any[] = [];
     const issues: ValidationIssue[] = [];
-    for (let i = 0; i < current_value.length; i++) {
-      try {
-        const parsedValue = await this.itemSchema.parse({
-          ...context,
-          path: [...context.path, i],
-          value: current_value[i],
-        });
-        newArray.push(parsedValue);
-      } catch (e) {
-        if (e instanceof ValidationError) {
-          issues.push(...e.issues);
-        } else {
-          throw e;
-        }
-      }
-    }
 
-    if (issues.length > 0) {
-      throw new ValidationError(issues);
-    }
-
-    let finalValue: any = newArray;
-
-    // Handle tuple validation if 'items' is present
+    // Handle tuple validation first if 'items' is present
     if (this.tupleSchemas) {
-      if (current_value.length !== this.tupleSchemas.length) {
+      if (value.length !== this.tupleSchemas.length) {
         issues.push({
           path: context.path,
-          message: `Expected a tuple of length ${this.tupleSchemas.length}, but received ${current_value.length}.`,
+          message: `Expected a tuple of length ${this.tupleSchemas.length}, but received ${value.length}.`,
         });
       } else {
         for (let i = 0; i < this.tupleSchemas.length; i++) {
           const itemSchema = this.tupleSchemas[i];
-          const item = current_value[i];
+          const item = value[i];
+          const childContext = {
+            ...context,
+            value: item,
+            path: [...context.path, i],
+          };
           try {
-            const parsedItem = await itemSchema.parse({
-              ...context,
-              path: [...context.path, i],
-              value: item,
-            });
-            finalValue[i] = parsedItem; // Overwrite the value from the 'ofType' pass
+            await itemSchema._validate(item, childContext);
           } catch (error) {
             if (error instanceof ValidationError) {
               issues.push(...error.issues);
             } else {
-              issues.push({
-                path: [...context.path, i],
-                message: "Invalid tuple item",
-              });
+              throw error;
             }
+          }
+        }
+      }
+    } else {
+      // Item-level validation
+      for (let i = 0; i < value.length; i++) {
+        const item = value[i];
+        const childContext = {
+          ...context,
+          value: item,
+          path: [...context.path, i],
+        };
+        try {
+          await this.itemSchema._validate(item, childContext);
+        } catch (e) {
+          if (e instanceof ValidationError) {
+            issues.push(...e.issues);
+          } else {
+            throw e;
           }
         }
       }
     }
 
-    if (issues.length > 0) {
-      throw new ValidationError(issues);
-    }
-
-    // Run array-level validators (length, etc.)
+    // Run array-level validators (length, etc.) after item validation
     for (const { name, validator, args } of this.validators) {
-      if (name === "identity" || name === "ofType") continue;
+      if (name === "identity" || name === "ofType" || name === "items")
+        continue;
       const result = await validator(
-        finalValue,
+        value,
         args,
-        { ...context, value: finalValue },
+        { ...context, value: value },
         this
       );
       if (!result) {
-        const path = context.path.join(".");
         const messages = this.config.messages as
           | { [key: string]: string }
           | undefined;
         let message = messages?.[name];
         if (!message) {
-          message = `Validation failed for array.${name} at path '${path}'`;
+          message = `Validation failed for array.${name}`;
         }
         issues.push({ path: context.path, message });
       }
     }
+
     if (issues.length > 0) {
       throw new ValidationError(issues);
     }
+  }
+
+  public async _transform(
+    value: any,
+    context: ValidationContext
+  ): Promise<Array<s.infer<T>>> {
+    if (value === undefined || value === null || !Array.isArray(value)) {
+      return value;
+    }
+
+    const transformedArray: any[] = [];
+    if (this.tupleSchemas) {
+      for (let i = 0; i < value.length; i++) {
+        const itemSchema = this.tupleSchemas[i] ?? this.itemSchema;
+        const item = value[i];
+        const childContext = {
+          ...context,
+          value: item,
+          path: [...context.path, i],
+        };
+        transformedArray.push(await itemSchema._transform(item, childContext));
+      }
+    } else {
+      for (let i = 0; i < value.length; i++) {
+        const item = value[i];
+        const childContext = {
+          ...context,
+          value: item,
+          path: [...context.path, i],
+        };
+        transformedArray.push(
+          await this.itemSchema._transform(item, childContext)
+        );
+      }
+    }
 
     // Array-level transformations
-    for (const { transformation, args } of this.transformations) {
-      finalValue = await transformation(
-        finalValue,
-        args,
-        { ...context, value: finalValue },
-        this
-      );
-    }
-    for (const customTransformation of this.customTransformations) {
-      finalValue = await customTransformation(
-        finalValue,
-        [],
-        { ...context, value: finalValue },
-        this
-      );
-    }
-
-    return finalValue;
+    return await super._transform(transformedArray, {
+      ...context,
+      value: transformedArray,
+    });
   }
 }
 
@@ -834,72 +805,115 @@ class RecordSchema<
     this.valueSchema = valueSchema;
   }
 
-  public async _parse(
-    context: ValidationContext
-  ): Promise<Record<s.infer<K>, s.infer<V>>> {
-    let current_value: any = context.value;
+  public async _prepare(context: ValidationContext): Promise<any> {
+    const value = await super._prepare(context);
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+      return value;
+    }
 
-    if (
-      typeof current_value !== "object" ||
-      current_value === null ||
-      Array.isArray(current_value)
-    ) {
+    const preparedRecord: Record<string, any> = {};
+    for (const [key, val] of Object.entries(value)) {
+      preparedRecord[key] = await this.valueSchema._prepare({
+        ...context,
+        value: val,
+        path: [...context.path, key],
+      });
+    }
+    return preparedRecord;
+  }
+
+  public async _validate(
+    value: any,
+    context: ValidationContext
+  ): Promise<void> {
+    await super._validate(value, context);
+
+    if (typeof value !== "object" || Array.isArray(value)) {
       throw new ValidationError([
         { path: context.path, message: "Input must be a record-like object." },
       ]);
     }
 
-    const finalRecord: Record<string | number, s.infer<V>> = {};
     const issues: ValidationIssue[] = [];
-
-    for (const [key, value] of Object.entries(current_value)) {
-      let parsedKey: s.infer<K>;
-      let parsedValue: s.infer<V>;
-
+    for (const [key, val] of Object.entries(value)) {
+      const keyContext = {
+        ...context,
+        value: key,
+        path: [...context.path, key],
+      };
       try {
-        parsedKey = (await this.keySchema.parse({
-          ...context,
-          path: [...context.path, key],
-          value: key,
-        })) as s.infer<K>;
-      } catch (error) {
-        if (error instanceof ValidationError) {
-          issues.push(...error.issues);
-        } else {
-          issues.push({
-            path: [...context.path, key],
-            message: "Invalid key",
-          });
-        }
-        continue;
-      }
-
-      try {
-        parsedValue = await this.valueSchema.parse({
-          ...context,
-          path: [...context.path, key],
-          value: value,
+        const preparedKey = await this.keySchema._prepare(keyContext);
+        await this.keySchema._validate(preparedKey, {
+          ...keyContext,
+          value: preparedKey,
         });
-      } catch (error) {
-        if (error instanceof ValidationError) {
-          issues.push(...error.issues);
+      } catch (e) {
+        if (e instanceof ValidationError) {
+          issues.push(
+            ...e.issues.map((issue) => ({
+              ...issue,
+              message: `Invalid key: ${issue.message}`,
+            }))
+          );
         } else {
-          issues.push({
-            path: [...context.path, key],
-            message: "Invalid value",
-          });
+          throw e;
         }
-        continue;
       }
 
-      finalRecord[parsedKey as any] = parsedValue;
+      const valueContext = {
+        ...context,
+        value: val,
+        path: [...context.path, key],
+      };
+      try {
+        await this.valueSchema._validate(val, valueContext);
+      } catch (e) {
+        if (e instanceof ValidationError) {
+          issues.push(...e.issues);
+        } else {
+          throw e;
+        }
+      }
     }
 
     if (issues.length > 0) {
       throw new ValidationError(issues);
     }
+  }
 
-    return finalRecord as Record<s.infer<K>, s.infer<V>>;
+  public async _transform(
+    value: any,
+    context: ValidationContext
+  ): Promise<Record<s.infer<K>, s.infer<V>>> {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+      return value;
+    }
+
+    const finalRecord: Record<string | number, s.infer<V>> = {};
+    for (const [key, val] of Object.entries(value as object)) {
+      const keyContext = {
+        ...context,
+        value: key,
+        path: [...context.path, key],
+      };
+      const valueContext = {
+        ...context,
+        value: val,
+        path: [...context.path, key],
+      };
+
+      const transformedKey = await this.keySchema.parse(keyContext);
+      const transformedValue = await this.valueSchema._transform(
+        val,
+        valueContext
+      );
+      finalRecord[transformedKey as any] = transformedValue;
+    }
+
+    return super._transform(finalRecord, {
+      ...context,
+      value: finalRecord,
+    }) as any;
   }
 }
 
@@ -935,14 +949,40 @@ class SwitchSchema<
     this.defaultSchema = defaultSchema;
   }
 
-  public async _parse(context: ValidationContext): Promise<any> {
+  private getSchema(context: ValidationContext): Schema<any, any> | undefined {
     const key = this.keyFn(context);
-    const schema = this.schemas[key] || this.defaultSchema;
+    return this.schemas[key] || this.defaultSchema;
+  }
 
+  public async _prepare(context: ValidationContext): Promise<any> {
+    const schema = this.getSchema(context);
     if (schema) {
-      return schema.parse(context);
+      return schema._prepare(context);
     }
     return context.value;
+  }
+
+  public async _validate(
+    value: any,
+    context: ValidationContext
+  ): Promise<void> {
+    const childContext = { ...context, value };
+    const schema = this.getSchema(childContext);
+    if (schema) {
+      return schema._validate(value, childContext);
+    }
+  }
+
+  public async _transform(
+    value: any,
+    context: ValidationContext
+  ): Promise<any> {
+    const childContext = { ...context, value };
+    const schema = this.getSchema(childContext);
+    if (schema) {
+      return schema._transform(value, childContext);
+    }
+    return value;
   }
 }
 
@@ -965,37 +1005,116 @@ class MapSchema<
     this.valueSchema = valueSchema;
   }
 
-  public async _parse(
+  public async _prepare(context: ValidationContext): Promise<any> {
+    const value = await super._prepare(context);
+    if (!(value instanceof Map)) {
+      return value;
+    }
+
+    const preparedMap = new Map();
+    for (const [key, val] of value.entries()) {
+      preparedMap.set(
+        key,
+        await this.valueSchema._prepare({
+          ...context,
+          value: val,
+          path: [...context.path, key, "value"],
+        })
+      );
+    }
+    return preparedMap;
+  }
+
+  public async _validate(
+    value: any,
     context: ValidationContext
-  ): Promise<Map<InferSchemaType<K>, InferSchemaType<V>>> {
-    if (!(context.value instanceof Map)) {
+  ): Promise<void> {
+    await super._validate(value, context);
+    if (value === undefined || value === null) return;
+
+    if (!(value instanceof Map)) {
       throw new ValidationError([
         { path: context.path, message: "Invalid type. Expected a Map." },
       ]);
     }
 
-    const newMap = new Map();
-    for (const [key, value] of context.value.entries()) {
-      const keyResult = await this.keySchema.safeParse({
+    const issues: ValidationIssue[] = [];
+    for (const [key, val] of value.entries()) {
+      const keyContext = {
         ...context,
-        path: [...context.path, key, "key"],
         value: key,
-      });
-      if (keyResult.status === "error") {
-        throw keyResult.error;
+        path: [...context.path, key, "key"],
+      };
+      try {
+        const preparedKey = await this.keySchema._prepare(keyContext);
+        await this.keySchema._validate(preparedKey, {
+          ...keyContext,
+          value: preparedKey,
+        });
+      } catch (e) {
+        if (e instanceof ValidationError) {
+          issues.push(
+            ...e.issues.map((issue) => ({
+              ...issue,
+              message: `Invalid key: ${issue.message}`,
+            }))
+          );
+        } else {
+          throw e;
+        }
       }
 
-      const valueResult = await this.valueSchema.safeParse({
+      const valueContext = {
         ...context,
+        value: val,
         path: [...context.path, key, "value"],
-        value: value,
-      });
-      if (valueResult.status === "error") {
-        throw valueResult.error;
+      };
+      try {
+        await this.valueSchema._validate(val, valueContext);
+      } catch (e) {
+        if (e instanceof ValidationError) {
+          issues.push(...e.issues);
+        } else {
+          throw e;
+        }
       }
-      newMap.set(keyResult.data, valueResult.data);
     }
-    return newMap;
+
+    if (issues.length > 0) {
+      throw new ValidationError(issues);
+    }
+  }
+
+  public async _transform(
+    value: any,
+    context: ValidationContext
+  ): Promise<Map<InferSchemaType<K>, InferSchemaType<V>>> {
+    if (!(value instanceof Map)) {
+      return value;
+    }
+
+    const newMap = new Map();
+    for (const [key, val] of value.entries()) {
+      const keyContext = {
+        ...context,
+        value: key,
+        path: [...context.path, key, "key"],
+      };
+      const valueContext = {
+        ...context,
+        value: val,
+        path: [...context.path, key, "value"],
+      };
+
+      const transformedKey = await this.keySchema.parse(keyContext);
+      const transformedValue = await this.valueSchema._transform(
+        val,
+        valueContext
+      );
+      newMap.set(transformedKey, transformedValue);
+    }
+
+    return super._transform(newMap, { ...context, value: newMap }) as any;
   }
 }
 
@@ -1015,28 +1134,80 @@ class SetSchema<V extends Schema<any, any>> extends Schema<
     this.valueSchema = valueSchema;
   }
 
-  public async _parse(
+  public async _prepare(context: ValidationContext): Promise<any> {
+    const value = await super._prepare(context);
+    if (!(value instanceof Set)) {
+      return value;
+    }
+
+    const preparedSet = new Set();
+    for (const val of value.values()) {
+      preparedSet.add(
+        await this.valueSchema._prepare({
+          ...context,
+          value: val,
+          path: [...context.path, val],
+        })
+      );
+    }
+    return preparedSet;
+  }
+
+  public async _validate(
+    value: any,
     context: ValidationContext
-  ): Promise<Set<InferSchemaType<V>>> {
-    if (!(context.value instanceof Set)) {
+  ): Promise<void> {
+    await super._validate(value, context);
+    if (value === undefined || value === null) return;
+
+    if (!(value instanceof Set)) {
       throw new ValidationError([
         { path: context.path, message: "Invalid type. Expected a Set." },
       ]);
     }
 
-    const newSet = new Set<InferSchemaType<V>>();
-    for (const value of context.value.values()) {
-      const valueResult = await this.valueSchema.safeParse({
+    const issues: ValidationIssue[] = [];
+    for (const val of value.values()) {
+      const valueContext = {
         ...context,
-        path: [...context.path, value],
-        value: value,
-      });
-      if (valueResult.status === "error") {
-        throw valueResult.error;
+        value: val,
+        path: [...context.path, val],
+      };
+      try {
+        await this.valueSchema._validate(val, valueContext);
+      } catch (e) {
+        if (e instanceof ValidationError) {
+          issues.push(...e.issues);
+        } else {
+          throw e;
+        }
       }
-      newSet.add(valueResult.data);
     }
-    return newSet;
+
+    if (issues.length > 0) {
+      throw new ValidationError(issues);
+    }
+  }
+
+  public async _transform(
+    value: any,
+    context: ValidationContext
+  ): Promise<Set<InferSchemaType<V>>> {
+    if (!(value instanceof Set)) {
+      return value;
+    }
+
+    const newSet = new Set<InferSchemaType<V>>();
+    for (const val of value.values()) {
+      const valueContext = {
+        ...context,
+        value: val,
+        path: [...context.path, val],
+      };
+      newSet.add(await this.valueSchema._transform(val, valueContext));
+    }
+
+    return super._transform(newSet, { ...context, value: newSet }) as any;
   }
 }
 
@@ -1056,16 +1227,21 @@ class InstanceOfSchema<T extends new (...args: any) => any> extends Schema<
     this.constructorFn = constructorFn;
   }
 
-  public async _parse(context: ValidationContext): Promise<InstanceType<T>> {
-    if (context.value instanceof this.constructorFn) {
-      return context.value;
+  public async _validate(
+    value: any,
+    context: ValidationContext
+  ): Promise<void> {
+    await super._validate(value, context);
+    if (value === undefined || value === null) return;
+
+    if (!(value instanceof this.constructorFn)) {
+      throw new ValidationError([
+        {
+          path: context.path,
+          message: `Invalid type. Expected instanceof ${this.constructorFn.name}.`,
+        },
+      ]);
     }
-    throw new ValidationError([
-      {
-        path: context.path,
-        message: `Invalid type. Expected instanceof ${this.constructorFn.name}.`,
-      },
-    ]);
   }
 }
 
@@ -1085,16 +1261,26 @@ class LiteralSchema<
     this.literal = literal;
   }
 
-  public async _parse(context: ValidationContext): Promise<T> {
-    if (context.value === this.literal) {
-      return context.value as T;
+  public async _validate(
+    value: any,
+    context: ValidationContext
+  ): Promise<void> {
+    await super._validate(value, context);
+    if (this.config.optional && value === undefined) return;
+    if (this.config.nullable && value === null) {
+      if (this.literal === null) return;
     }
-    throw new ValidationError([
-      {
-        path: context.path,
-        message: `Invalid literal value. Expected ${this.literal}, received ${context.value}`,
-      },
-    ]);
+
+    if (value !== this.literal) {
+      throw new ValidationError([
+        {
+          path: context.path,
+          message: `Invalid literal value. Expected ${JSON.stringify(
+            this.literal
+          )}, received ${JSON.stringify(value)}`,
+        },
+      ]);
+    }
   }
 }
 
@@ -1114,13 +1300,20 @@ class UnionSchema<
     this.schemas = schemas;
   }
 
-  public async _parse(
-    context: ValidationContext
+  public async parse(
+    dataOrContext: any | ValidationContext
   ): Promise<InferSchemaType<T[number]>> {
+    const context: ValidationContext = isValidationContext(dataOrContext)
+      ? dataOrContext
+      : {
+          rootData: dataOrContext,
+          path: [],
+          value: dataOrContext,
+        };
+
     const issues: ValidationIssue[] = [];
     for (const schema of this.schemas) {
       try {
-        // Since .parse() is now async, we must await it.
         return await schema.parse(context);
       } catch (e) {
         if (e instanceof ValidationError) {
