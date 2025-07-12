@@ -5,7 +5,7 @@ import { ValidationError } from "../validators/types.js";
 describe("Union Validator", () => {
   it("should pass if the value matches one of the schemas", async () => {
     const schema = s.union({
-      validate: { identity: [s.string(), s.number()] },
+      validate: { variants: [s.string(), s.number()] },
     });
     await expect(schema.parse("hello")).resolves.toBe("hello");
     await expect(schema.parse(123)).resolves.toBe(123);
@@ -13,16 +13,19 @@ describe("Union Validator", () => {
 
   it("should throw if the value does not match any of the schemas", async () => {
     const schema = s.union({
-      validate: { identity: [s.string(), s.number()] },
+      validate: { variants: [s.string(), s.number()] },
     });
     await expect(schema.parse(true as any)).rejects.toThrow(ValidationError);
   });
 
   it("should pass with more complex schemas", async () => {
-    const stringSchema = s.string({ validate: { minLength: 5 } });
-    const numberSchema = s.number({ validate: { min: 100 } });
     const schema = s.union({
-      validate: { identity: [stringSchema, numberSchema] },
+      validate: {
+        variants: [
+          s.string({ validate: { minLength: 5 } }),
+          s.number({ validate: { gte: 100 } }),
+        ],
+      },
     });
 
     await expect(schema.parse("long enough")).resolves.toBe("long enough");
@@ -30,13 +33,15 @@ describe("Union Validator", () => {
   });
 
   it("should throw with more complex schemas if validation fails", async () => {
-    const stringSchema = s.string({ validate: { minLength: 6 } });
-    const numberSchema = s.number({ validate: { min: 100 } });
     const schema = s.union({
-      validate: { identity: [stringSchema, numberSchema] },
+      validate: {
+        variants: [
+          s.string({ validate: { minLength: 5 } }),
+          s.number({ validate: { gte: 100 } }),
+        ],
+      },
     });
-
-    const result = await schema.safeParse("short");
+    const result = await schema.safeParse("shrt");
     expect(result.status).toBe("error");
     if (result.status === "error") {
       expect(result.error.issues).toHaveLength(2); // one for string, one for number
@@ -44,31 +49,35 @@ describe("Union Validator", () => {
   });
 
   it("should work with object schemas", async () => {
-    const schemaA = s.object({
+    const schema = s.union({
       validate: {
-        properties: {
-          type: s.literal({ validate: { identity: "a" } }),
-          a: s.string(),
-        },
+        variants: [
+          s.object({
+            validate: {
+              properties: {
+                type: s.literal("a"),
+                a: s.string(),
+              },
+            },
+          }),
+          s.object({
+            validate: {
+              properties: {
+                type: s.literal("b"),
+                b: s.number(),
+              },
+            },
+          }),
+        ],
       },
     });
-    const schemaB = s.object({
-      validate: {
-        properties: {
-          type: s.literal({ validate: { identity: "b" } }),
-          b: s.number(),
-        },
-      },
-    });
-    const schema = s.union({ validate: { identity: [schemaA, schemaB] } });
-    const dataA = { type: "a", a: "hello" };
-    const dataB = { type: "b", b: 123 };
+
+    const dataA = { type: "a" as const, a: "hello" };
+    const dataB = { type: "b" as const, b: 123 };
     const invalidData = { type: "a", a: 123 };
 
-    await expect(schema.parse(dataA as any)).resolves.toEqual(dataA);
-    await expect(schema.parse(dataB as any)).resolves.toEqual(dataB);
-    await expect(schema.parse(invalidData as any)).rejects.toThrow(
-      ValidationError
-    );
+    await expect(schema.parse(dataA)).resolves.toEqual(dataA);
+    await expect(schema.parse(dataB)).resolves.toEqual(dataB);
+    await expect(schema.parse(invalidData)).rejects.toThrow(ValidationError);
   });
 });

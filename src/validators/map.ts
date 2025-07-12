@@ -1,49 +1,48 @@
 import {
   definePlugin,
-  type ValidatorDefinition,
   Schema,
   ValidationError,
+  ValidationIssue,
   ValidationContext,
 } from "./types.js";
 
-export const mapPlugin = definePlugin<Map<any, any>>({
+export const mapPlugin = definePlugin({
   dataType: "map",
   validate: {
     identity: {
+      validator: (value: unknown): value is Map<unknown, unknown> => {
+        return value instanceof Map;
+      },
+      message: (ctx) =>
+        `Invalid type. Expected Map, received ${typeof ctx.value}.`,
+    },
+    entries: {
       validator: async (
-        value: unknown,
-        [keySchema, valueSchema]: [
-          Schema<any, any> | undefined,
-          Schema<any, any> | undefined
-        ],
+        value: Map<unknown, unknown>,
+        [keySchema, valueSchema]: [Schema<any, any>, Schema<any, any>],
         context: ValidationContext
       ) => {
-        if (!(value instanceof Map)) return false;
-        if (!keySchema || !valueSchema) return false;
-
-        const issues: ValidationError[] = [];
+        const issues: ValidationIssue[] = [];
 
         for (const [key, val] of value.entries()) {
-          try {
-            await keySchema.parse(key, context);
-            await valueSchema.parse(val, context);
-          } catch (e) {
-            if (e instanceof ValidationError) {
-              issues.push(e);
-            } else {
-              throw e;
-            }
+          const keyResult = await keySchema.safeParse(key, context);
+          if (keyResult.status === "error") {
+            issues.push(...keyResult.error.issues);
+          }
+
+          const valueResult = await valueSchema.safeParse(val, context);
+          if (valueResult.status === "error") {
+            issues.push(...valueResult.error.issues);
           }
         }
 
         if (issues.length > 0) {
-          throw new ValidationError(issues.flatMap((e) => e.issues));
+          throw new ValidationError(issues);
         }
 
         return true;
       },
-      message: (ctx) =>
-        `Invalid type. Expected Map, received ${typeof ctx.value}.`,
+      message: (ctx) => `Map validation failed.`,
     },
   },
 });

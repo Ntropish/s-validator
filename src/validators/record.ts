@@ -2,54 +2,49 @@ import {
   definePlugin,
   Schema,
   ValidationError,
+  ValidationIssue,
   ValidationContext,
 } from "./types.js";
 
-export const recordPlugin = definePlugin<Record<any, any>>({
+export const recordPlugin = definePlugin({
   dataType: "record",
   validate: {
     identity: {
+      validator: (value: unknown) => {
+        return (
+          typeof value === "object" && value !== null && !Array.isArray(value)
+        );
+      },
+      message: (ctx) =>
+        `Invalid type. Expected a record object, received ${typeof ctx.value}.`,
+    },
+    keysAndValues: {
       validator: async (
-        value: unknown,
-        [keySchema, valueSchema]: [
-          Schema<any, any> | undefined,
-          Schema<any, any> | undefined
-        ],
+        value: Record<string, unknown>,
+        [keySchema, valueSchema]: [Schema<any, any>, Schema<any, any>],
         context: ValidationContext
       ) => {
-        if (
-          typeof value !== "object" ||
-          value === null ||
-          Array.isArray(value)
-        ) {
-          return false;
-        }
-
-        if (!keySchema || !valueSchema) return false;
-
-        const issues: ValidationError[] = [];
+        const issues: ValidationIssue[] = [];
 
         for (const [key, val] of Object.entries(value)) {
-          try {
-            await keySchema.parse(key, context);
-            await valueSchema.parse(val, context);
-          } catch (e) {
-            if (e instanceof ValidationError) {
-              issues.push(e);
-            } else {
-              throw e;
-            }
+          const keyResult = await keySchema.safeParse(key, context);
+          if (keyResult.status === "error") {
+            issues.push(...keyResult.error.issues);
+          }
+
+          const valueResult = await valueSchema.safeParse(val, context);
+          if (valueResult.status === "error") {
+            issues.push(...valueResult.error.issues);
           }
         }
 
         if (issues.length > 0) {
-          throw new ValidationError(issues.flatMap((e) => e.issues));
+          throw new ValidationError(issues);
         }
 
         return true;
       },
-      message: (ctx) =>
-        `Invalid type. Expected a record object, received ${typeof ctx.value}.`,
+      message: (ctx) => `Record validation failed.`,
     },
   },
 });

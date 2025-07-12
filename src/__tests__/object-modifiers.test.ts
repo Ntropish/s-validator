@@ -162,15 +162,13 @@ describe("Object Modifiers", () => {
     });
 
     it("should not affect the original schema", async () => {
-      const newSchema = baseSchema.extend({ age: s.number() });
-      // original schema should still pass with just a name
-      await expect(newSchema.parse({ name: "test" })).resolves.toEqual({
+      baseSchema.extend({
+        age: s.number(),
+      });
+      // The original schema is unchanged and still only requires 'name'.
+      await expect(baseSchema.parse({ name: "test" })).resolves.toEqual({
         name: "test",
       });
-      // original schema should ignore extra properties because it is not strict
-      await expect(newSchema.parse({ name: "John", age: 30 })).resolves.toEqual(
-        { name: "John", age: 30 }
-      );
     });
 
     it("should correctly validate the extended schema", async () => {

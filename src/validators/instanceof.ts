@@ -1,16 +1,19 @@
-import { definePlugin, type ValidatorDefinition } from "./types.js";
+import { definePlugin } from "./types.js";
 
 type Class = new (...args: any[]) => any;
 
-export const instanceofPlugin = definePlugin<any>({
+export const instanceofPlugin = definePlugin({
   dataType: "instanceof",
   validate: {
     identity: {
-      validator: (
-        value: unknown,
-        [constructor]: [Class | undefined]
-      ): value is any => {
-        if (!constructor) return false;
+      validator: (value: unknown): value is object => {
+        return typeof value === "object" && value !== null;
+      },
+      message: (ctx) =>
+        `Invalid type. Expected object, received ${typeof ctx.value}.`,
+    },
+    constructor: {
+      validator: (value: unknown, [constructor]: [Class]): value is any => {
         return value instanceof constructor;
       },
       message: (ctx) => {

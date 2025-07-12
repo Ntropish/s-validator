@@ -96,7 +96,7 @@ export class Schema<TOutput, TInput = TOutput>
   }> = [];
   protected customTransformations: TransformationFunction[] = [];
   protected customValidators: CustomValidator<TOutput>[] = [];
-  private dataType: string;
+  protected dataType: string;
   public config: Record<string, unknown>;
   public label: string;
   public readonly "~standard": StandardSchemaV1.Props<TInput, TOutput>;
@@ -165,7 +165,7 @@ export class Schema<TOutput, TInput = TOutput>
           this.validators.push({
             name: valName,
             validator: validatorCollection[valName],
-            args: [valConfig],
+            args: Array.isArray(valConfig) ? valConfig : [valConfig],
           });
         }
       }
@@ -231,17 +231,14 @@ export class Schema<TOutput, TInput = TOutput>
     return current_value;
   }
 
-  public async _validate(
-    value: any,
-    context: ValidationContext
-  ): Promise<void> {
+  public async _validate(value: any, context: ValidationContext): Promise<any> {
     const issues: ValidationIssue[] = [];
     const messages = (this.config as ValidatorConfig<any>).messages ?? {};
     const current_value = value;
 
     // Optional/nullable checks must happen on the prepared value
     if (this.config.optional && current_value === undefined) return;
-    if (this.config.nullable && current_value === null) return;
+    if (this.config.nullable && current_value === null) return current_value;
 
     // Run identity validation first
     const identityValidator = this.validators.find(
@@ -387,6 +384,8 @@ export class Schema<TOutput, TInput = TOutput>
     if (issues.length > 0) {
       throw new ValidationError(issues);
     }
+
+    return current_value;
   }
 
   public async _transform(
@@ -423,10 +422,13 @@ export class Schema<TOutput, TInput = TOutput>
     };
 
     const preparedValue = await this._prepare(context);
-    await this._validate(preparedValue, { ...context, value: preparedValue });
-    const transformedValue = await this._transform(preparedValue, {
+    const validatedValue = await this._validate(preparedValue, {
       ...context,
       value: preparedValue,
+    });
+    const transformedValue = await this._transform(validatedValue, {
+      ...context,
+      value: validatedValue,
     });
     return transformedValue;
   }
@@ -477,6 +479,118 @@ class ObjectSchema<
     super("object", config);
   }
 
+  public async _validate(
+    value: Record<string, any>,
+    context: ValidationContext
+  ): Promise<any> {
+    if (this.config.optional && value === undefined) {
+      return undefined;
+    }
+    if (this.config.nullable && value === null) {
+      return null;
+    }
+
+    // First, run the basic identity check from the base Schema class.
+    // This checks if the value is a non-null object.
+    await super._validate(value, context);
+
+    const shape = this.getProperties();
+    const strict = this.config.strict as boolean;
+    const issues: ValidationIssue[] = [];
+    const newValue: Record<string, any> = {};
+
+    // Parse all child properties defined in the shape.
+    for (const key in shape) {
+      const propertySchema = shape[key];
+      const propertyValue = value[key];
+
+      if (Object.prototype.hasOwnProperty.call(value, key)) {
+        const result = await propertySchema.safeParse(propertyValue, {
+          ...context,
+          path: [...context.path, key],
+        });
+
+        if (result.status === "success") {
+          if (result.data !== undefined) {
+            newValue[key] = result.data;
+          }
+        } else {
+          issues.push(...result.error.issues);
+        }
+      } else if (!propertySchema.config.optional) {
+        issues.push({
+          path: [...context.path, key],
+          message: `Required property '${key}' is missing`,
+        });
+      }
+    }
+
+    // Handle unrecognized keys in strict mode.
+    if (strict) {
+      for (const key in value) {
+        if (!shape[key]) {
+          issues.push({
+            path: [...context.path, key],
+            message: `Unrecognized key: '${key}'`,
+          });
+        }
+      }
+    } else {
+      // Copy over properties that are not in the schema if not in strict mode.
+      for (const key in value) {
+        if (!shape[key]) {
+          newValue[key] = value[key];
+        }
+      }
+    }
+
+    if (issues.length > 0) {
+      throw new ValidationError(issues);
+    }
+
+    // Now, with a fully parsed and transformed object, run the custom validators.
+    for (const customValidator of this.customValidators) {
+      const result =
+        typeof customValidator === "function"
+          ? await customValidator(newValue as T, {
+              ...context,
+              value: newValue,
+            })
+          : await customValidator.validator(newValue as T, {
+              ...context,
+              value: newValue,
+            });
+
+      if (!result) {
+        let message: string | undefined;
+        if (typeof customValidator === "object" && customValidator.message) {
+          message =
+            typeof customValidator.message === "string"
+              ? customValidator.message
+              : (customValidator.message as MessageProducer)({
+                  label: this.label,
+                  value: newValue,
+                  path: context.path,
+                  dataType: this.dataType,
+                  ctx: context.ctx,
+                  args: [],
+                  schema: this,
+                });
+        }
+        issues.push({
+          path: context.path,
+          message: message ?? `Custom validation failed for ${this.dataType}`,
+        });
+      }
+    }
+
+    if (issues.length > 0) {
+      throw new ValidationError(issues);
+    }
+
+    return newValue;
+  }
+
   private getProperties(): P {
     const config = this.config as { validate?: { properties?: P } };
     return config.validate?.properties ?? ({} as P);
@@ -514,6 +628,7 @@ class ObjectSchema<
         ...(this.config.validate as Record<string, unknown>),
         properties: newProperties as Pick<P, K>,
       },
+      strict: true,
     };
     return new ObjectSchema(newConfig as any);
   }
@@ -522,7 +637,7 @@ class ObjectSchema<
     keys: K[]
   ): ObjectSchema<Omit<P, K>, Omit<T, K>> {
     const originalProperties = this.getProperties();
-    const newProperties = { ...originalProperties };
+    const newProperties: Partial<Omit<P, K>> = { ...originalProperties };
     for (const key of keys) {
       delete (newProperties as any)[key];
     }
@@ -532,6 +647,7 @@ class ObjectSchema<
         ...(this.config.validate as Record<string, unknown>),
         properties: newProperties as Omit<P, K>,
       },
+      strict: true,
     };
     return new ObjectSchema(newConfig as any);
   }
@@ -555,7 +671,7 @@ class ObjectSchema<
 type Builder = {
   [P in Exclude<
     (typeof plugins)[number],
-    { dataType: "switch" | "object" }
+    { dataType: "switch" | "object" | "literal" }
   > as P["dataType"]]: (
     config?: ValidatorConfig<any>
   ) => Schema<
@@ -567,6 +683,17 @@ type Builder = {
     config: ValidatorConfig<any> & { validate?: { properties?: P } }
   ): ObjectSchema<P, InferSObjectType<P>>;
   switch(config: SwitchConfig): Schema<any>;
+  literal(value: string | number | boolean | null | undefined): Schema<any>;
+  record(
+    keySchema: Schema<any, any>,
+    valueSchema: Schema<any, any>
+  ): Schema<Record<any, any>>;
+  map(
+    keySchema: Schema<any, any>,
+    valueSchema: Schema<any, any>
+  ): Schema<Map<any, any>>;
+  set(itemSchema: Schema<any, any>): Schema<Set<any>>;
+  instanceof(constructor: new (...args: any[]) => any): Schema<any>;
 };
 
 function createSchemaBuilder(): Builder {
@@ -578,6 +705,50 @@ function createSchemaBuilder(): Builder {
       builder.object = <P extends SObjectProperties>(
         config: ValidatorConfig<any> & { validate?: { properties?: P } }
       ) => new ObjectSchema<P, InferSObjectType<P>>(config);
+      continue;
+    }
+    if (plugin.dataType === "literal") {
+      builder.literal = (value: any) => {
+        return new Schema("literal", { validate: { equals: value } });
+      };
+      continue;
+    }
+    if (plugin.dataType === "record") {
+      builder.record = (
+        keySchema: Schema<any, any>,
+        valueSchema: Schema<any, any>
+      ) => {
+        return new Schema("record", {
+          validate: { keysAndValues: [keySchema, valueSchema] },
+        });
+      };
+      continue;
+    }
+    if (plugin.dataType === "map") {
+      builder.map = (
+        keySchema: Schema<any, any>,
+        valueSchema: Schema<any, any>
+      ) => {
+        return new Schema("map", {
+          validate: { entries: [keySchema, valueSchema] },
+        });
+      };
+      continue;
+    }
+    if (plugin.dataType === "set") {
+      builder.set = (itemSchema: Schema<any, any>) => {
+        return new Schema("set", {
+          validate: { items: itemSchema },
+        });
+      };
+      continue;
+    }
+    if (plugin.dataType === "instanceof") {
+      builder.instanceof = (constructor: any) => {
+        return new Schema("instanceof", {
+          validate: { constructor: constructor },
+        });
+      };
       continue;
     }
     builder[plugin.dataType] = (config?: ValidatorConfig<any>) => {

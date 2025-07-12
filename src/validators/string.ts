@@ -63,26 +63,25 @@ export const stringPlugin = definePlugin<string>({
         `${ctx.label} must be at most ${ctx.args[0]} characters long.`,
     },
     range: {
-      validator: (value: string, [[min, max]]: [[number, number]]) =>
+      validator: (value: string, [min, max]: [number, number]) =>
         value.length >= min && value.length <= max,
       message: (ctx) =>
-        `${ctx.label} must be between ${ctx.args[0][0]} and ${ctx.args[0][1]} characters long.`,
+        `${ctx.label} must be between ${ctx.args[0]} and ${ctx.args[1]} characters long.`,
     },
     exclusiveRange: {
-      validator: (value: string, [[min, max]]: [[number, number]]) =>
+      validator: (value: string, [min, max]: [number, number]) =>
         value.length > min && value.length < max,
       message: (ctx) =>
-        `${ctx.label} must be strictly between ${ctx.args[0][0]} and ${ctx.args[0][1]} characters long.`,
+        `${ctx.label} must be strictly between ${ctx.args[0]} and ${ctx.args[1]} characters long.`,
     },
     pattern: {
       validator: (value: string, [pattern]: [RegExp]) => pattern.test(value),
       message: (ctx) => `${ctx.label} does not match the required pattern.`,
     },
     oneOf: {
-      validator: (value: string, [options]: [string[]]) =>
-        options.includes(value),
+      validator: (value: string, options: string[]) => options.includes(value),
       message: (ctx) =>
-        `${ctx.label} must be one of the following values: ${ctx.args[0].join(
+        `${ctx.label} must be one of the following values: ${ctx.args.join(
           ", "
         )}`,
     },
@@ -259,14 +258,15 @@ export const stringPlugin = definePlugin<string>({
           | undefined
         ]
       ) => {
-        if (config === undefined) {
+        if (config === undefined || config === false) {
           return true;
         }
-        if (typeof config === "object") {
-          if (!regex.email.test(value)) {
-            return false;
-          }
 
+        if (!regex.email.test(value)) {
+          return false;
+        }
+
+        if (typeof config === "object") {
           const domain = value.substring(value.lastIndexOf("@") + 1);
 
           if (config.denied) {
@@ -289,11 +289,9 @@ export const stringPlugin = definePlugin<string>({
             }
             return false;
           }
-
-          return true;
         }
 
-        return config ? regex.email.test(value) : !regex.email.test(value);
+        return true;
       },
       message: (ctx) => `${ctx.label} must be a valid email address.`,
     },

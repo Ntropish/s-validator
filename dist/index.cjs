@@ -1271,7 +1271,8 @@ class ObjectSchema extends Schema {
       validate: {
         ...this.config.validate,
         properties: newProperties
-      }
+      },
+      strict: true
     };
     return new ObjectSchema(newConfig);
   }
@@ -1286,7 +1287,8 @@ class ObjectSchema extends Schema {
       validate: {
         ...this.config.validate,
         properties: newProperties
-      }
+      },
+      strict: true
     };
     return new ObjectSchema(newConfig);
   }

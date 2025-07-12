@@ -5,17 +5,19 @@ import {
   ValidationContext,
 } from "./types.js";
 
-export const unionPlugin = definePlugin<any>({
+export const unionPlugin = definePlugin({
   dataType: "union",
   validate: {
     identity: {
+      validator: () => true,
+      message: () => "is any",
+    },
+    variants: {
       validator: async (
         value: unknown,
-        [schemas]: [Schema<any, any>[] | undefined],
+        schemas: Schema<any, any>[],
         context: ValidationContext
       ) => {
-        if (!schemas) return false;
-
         const issues = [];
         for (const schema of schemas) {
           try {

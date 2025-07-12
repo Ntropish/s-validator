@@ -4,42 +4,42 @@ import { ValidationError } from "../validators/types.js";
 
 describe("Literal Validator", () => {
   it("should pass for a correct string literal", async () => {
-    const schema = s.literal({ validate: { identity: "hello" } });
+    const schema = s.literal("hello");
     await expect(schema.parse("hello")).resolves.toBe("hello");
   });
 
   it("should throw for an incorrect string literal", async () => {
-    const schema = s.literal({ validate: { identity: "hello" } });
+    const schema = s.literal("hello");
     await expect(schema.parse("world" as any)).rejects.toThrow(ValidationError);
   });
 
   it("should pass for a correct number literal", async () => {
-    const schema = s.literal({ validate: { identity: 123 } });
+    const schema = s.literal(123);
     await expect(schema.parse(123)).resolves.toBe(123);
   });
 
   it("should throw for an incorrect number literal", async () => {
-    const schema = s.literal({ validate: { identity: 123 } });
+    const schema = s.literal(123);
     await expect((schema as any).parse(456)).rejects.toThrow(ValidationError);
   });
 
   it("should pass for a correct boolean literal", async () => {
-    const schema = s.literal({ validate: { identity: true } });
+    const schema = s.literal(true);
     await expect(schema.parse(true)).resolves.toBe(true);
   });
 
   it("should throw for an incorrect boolean literal", async () => {
-    const schema = s.literal({ validate: { identity: true } });
+    const schema = s.literal(true);
     await expect((schema as any).parse(false)).rejects.toThrow(ValidationError);
   });
 
   it("should pass for null literal", async () => {
-    const schema = s.literal({ validate: { identity: null } });
+    const schema = s.literal(null);
     await expect(schema.parse(null)).resolves.toBe(null);
   });
 
   it("should throw for non-null value for null literal", async () => {
-    const schema = s.literal({ validate: { identity: null } });
+    const schema = s.literal(null);
     await expect((schema as any).parse(undefined)).rejects.toThrow(
       ValidationError
     );
@@ -50,7 +50,7 @@ describe("Literal Validator", () => {
     const schema = s.object({
       validate: {
         properties: {
-          type: s.literal({ validate: { identity: "user" } }),
+          type: s.literal("user"),
           name: s.string(),
         },
       },
@@ -63,7 +63,7 @@ describe("Literal Validator", () => {
     const schema = s.object({
       validate: {
         properties: {
-          type: s.literal({ validate: { identity: "user" } }),
+          type: s.literal("user"),
           name: s.string(),
         },
       },
