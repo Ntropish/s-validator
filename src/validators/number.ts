@@ -6,6 +6,10 @@ export const numberValidatorMap = {
       typeof value === "number" && !isNaN(value),
     min: (value: number, [min]: [number]) => value >= min,
     max: (value: number, [max]: [number]) => value <= max,
+    gt: (value: number, [num]: [number]) => value > num,
+    gte: (value: number, [num]: [number]) => value >= num,
+    lt: (value: number, [num]: [number]) => value < num,
+    lte: (value: number, [num]: [number]) => value <= num,
     range: (value: number, [[min, max]]: [[number, number]]) =>
       value >= min && value <= max,
     exclusiveRange: (value: number, [[min, max]]: [[number, number]]) =>

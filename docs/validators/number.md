@@ -36,6 +36,42 @@ s.number().max(5).parse(5); // ✅
 s.number().max(5).parse(6); // ❌
 ```
 
+### `.gt(value: number)`
+
+Checks if the number is greater than `value`.
+
+```typescript
+s.number().gt(5).parse(6); // ✅
+s.number().gt(5).parse(5); // ❌
+```
+
+### `.gte(value: number)`
+
+Checks if the number is greater than or equal to `value`. (Alias for `.min()`)
+
+```typescript
+s.number().gte(5).parse(5); // ✅
+s.number().gte(5).parse(4); // ❌
+```
+
+### `.lt(value: number)`
+
+Checks if the number is less than `value`.
+
+```typescript
+s.number().lt(5).parse(4); // ✅
+s.number().lt(5).parse(5); // ❌
+```
+
+### `.lte(value: number)`
+
+Checks if the number is less than or equal to `value`. (Alias for `.max()`)
+
+```typescript
+s.number().lte(5).parse(5); // ✅
+s.number().lte(5).parse(6); // ❌
+```
+
 ### `.range([min, max]: [number, number])`
 
 Checks if the number is within the inclusive range `[min, max]`.

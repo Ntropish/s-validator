@@ -264,6 +264,131 @@ class SwitchSchema<T> extends Schema<T> {
   }
 }
 
+class MapSchema<K extends Schema<any>, V extends Schema<any>> extends Schema<
+  Map<InferSchemaType<K>, InferSchemaType<V>>
+> {
+  private keySchema: K;
+  private valueSchema: V;
+
+  constructor(keySchema: K, valueSchema: V) {
+    super("map", {}, validatorMap as SchemaValidatorMap);
+    this.keySchema = keySchema;
+    this.valueSchema = valueSchema;
+  }
+
+  protected async _parse(
+    context: ValidationContext
+  ): Promise<Map<InferSchemaType<K>, InferSchemaType<V>>> {
+    if (!(context.value instanceof Map)) {
+      throw new ValidationError([
+        { path: context.path, message: "Invalid type. Expected a Map." },
+      ]);
+    }
+
+    const newMap = new Map();
+    for (const [key, value] of context.value.entries()) {
+      const keyResult = await this.keySchema.safeParse({
+        ...context,
+        path: [...context.path, key, "key"],
+        value: key,
+      });
+      if (keyResult.status === "error") {
+        throw keyResult.error;
+      }
+
+      const valueResult = await this.valueSchema.safeParse({
+        ...context,
+        path: [...context.path, key, "value"],
+        value: value,
+      });
+      if (valueResult.status === "error") {
+        throw valueResult.error;
+      }
+      newMap.set(keyResult.data, valueResult.data);
+    }
+    return newMap;
+  }
+}
+
+class SetSchema<V extends Schema<any>> extends Schema<Set<InferSchemaType<V>>> {
+  private valueSchema: V;
+
+  constructor(valueSchema: V) {
+    super("set", {}, validatorMap as SchemaValidatorMap);
+    this.valueSchema = valueSchema;
+  }
+
+  protected async _parse(
+    context: ValidationContext
+  ): Promise<Set<InferSchemaType<V>>> {
+    if (!(context.value instanceof Set)) {
+      throw new ValidationError([
+        { path: context.path, message: "Invalid type. Expected a Set." },
+      ]);
+    }
+
+    const newSet = new Set<InferSchemaType<V>>();
+    for (const value of context.value.values()) {
+      const valueResult = await this.valueSchema.safeParse({
+        ...context,
+        path: [...context.path, value],
+        value: value,
+      });
+      if (valueResult.status === "error") {
+        throw valueResult.error;
+      }
+      newSet.add(valueResult.data);
+    }
+    return newSet;
+  }
+}
+
+class InstanceOfSchema<T extends new (...args: any) => any> extends Schema<
+  InstanceType<T>
+> {
+  private constructorFn: T;
+
+  constructor(constructorFn: T) {
+    super("instanceof", {}, validatorMap as SchemaValidatorMap);
+    this.constructorFn = constructorFn;
+  }
+
+  protected async _parse(context: ValidationContext): Promise<InstanceType<T>> {
+    if (context.value instanceof this.constructorFn) {
+      return context.value;
+    }
+    throw new ValidationError([
+      {
+        path: context.path,
+        message: `Invalid type. Expected instanceof ${this.constructorFn.name}.`,
+      },
+    ]);
+  }
+}
+
+class LiteralSchema<
+  T extends string | number | boolean | null | undefined
+> extends Schema<T> {
+  private literal: T;
+
+  constructor(literal: T) {
+    super("literal", {}, validatorMap as SchemaValidatorMap);
+    this.literal = literal;
+  }
+
+  protected async _parse(context: ValidationContext): Promise<T> {
+    if (context.value === this.literal) {
+      return context.value as T;
+    }
+    throw new ValidationError([
+      {
+        path: context.path,
+        message: `Invalid literal value. Expected ${this.literal}, received ${context.value}`,
+      },
+    ]);
+  }
+}
+
 class UnionSchema<T extends [Schema<any>, ...Schema<any>[]]> extends Schema<
   InferSchemaType<T[number]>
 > {
@@ -305,6 +430,17 @@ type CreateSchemaBuilder<TMap extends SchemaValidatorMap> = {
     defaultSchema?: TSchema
   ): TSchema;
   union<T extends [Schema<any>, ...Schema<any>[]]>(schemas: T): UnionSchema<T>;
+  literal<T extends string | number | boolean | null | undefined>(
+    literal: T
+  ): LiteralSchema<T>;
+  map<K extends Schema<any>, V extends Schema<any>>(
+    keySchema: K,
+    valueSchema: V
+  ): MapSchema<K, V>;
+  set<V extends Schema<any>>(valueSchema: V): SetSchema<V>;
+  instanceof<T extends new (...args: any) => any>(
+    constructorFn: T
+  ): InstanceOfSchema<T>;
 };
 
 function createSchemaFunction<
@@ -339,6 +475,29 @@ export function createSchemaBuilder<TMap extends SchemaValidatorMap>(
 
   builder.union = <T extends [Schema<any>, ...Schema<any>[]]>(schemas: T) => {
     return new UnionSchema(schemas);
+  };
+
+  builder.literal = <T extends string | number | boolean | null | undefined>(
+    literal: T
+  ) => {
+    return new LiteralSchema(literal);
+  };
+
+  builder.map = <K extends Schema<any>, V extends Schema<any>>(
+    keySchema: K,
+    valueSchema: V
+  ) => {
+    return new MapSchema(keySchema, valueSchema);
+  };
+
+  builder.set = <V extends Schema<any>>(valueSchema: V) => {
+    return new SetSchema(valueSchema);
+  };
+
+  builder.instanceof = <T extends new (...args: any) => any>(
+    constructorFn: T
+  ) => {
+    return new InstanceOfSchema(constructorFn);
   };
 
   return builder;

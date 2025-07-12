@@ -7,6 +7,13 @@ import { stringValidatorMap } from "./validators/string.js";
 import { SchemaValidatorMap } from "./validators/types.js";
 import { dateValidatorMap } from "./validators/date.js";
 import { anyValidatorMap } from "./validators/any.js";
+import { bigintValidatorMap } from "./validators/bigint.js";
+import { nanValidatorMap } from "./validators/nan.js";
+import { unknownValidatorMap } from "./validators/unknown.js";
+import { neverValidatorMap } from "./validators/never.js";
+import { mapValidatorMap } from "./validators/map.js";
+import { setValidatorMap } from "./validators/set.js";
+import { instanceofValidatorMap } from "./validators/instanceof.js";
 
 type ValidatorMapUnion =
   | typeof stringValidatorMap
@@ -15,7 +22,14 @@ type ValidatorMapUnion =
   | typeof objectValidatorMap
   | typeof arrayValidatorMap
   | typeof dateValidatorMap
-  | typeof anyValidatorMap;
+  | typeof anyValidatorMap
+  | typeof bigintValidatorMap
+  | typeof nanValidatorMap
+  | typeof unknownValidatorMap
+  | typeof neverValidatorMap
+  | typeof mapValidatorMap
+  | typeof setValidatorMap
+  | typeof instanceofValidatorMap;
 
 type MergedValidators = Intersect<UnionToIntersection<ValidatorMapUnion>>;
 
@@ -27,4 +41,11 @@ export const validatorMap: MergedValidators = {
   ...arrayValidatorMap,
   ...dateValidatorMap,
   ...anyValidatorMap,
+  ...bigintValidatorMap,
+  ...nanValidatorMap,
+  ...unknownValidatorMap,
+  ...neverValidatorMap,
+  ...mapValidatorMap,
+  ...setValidatorMap,
+  ...instanceofValidatorMap,
 };
