@@ -2,66 +2,38 @@
 
 Welcome to the official documentation for `s-val`, a lightweight, zero-dependency, and type-safe validation library for TypeScript and JavaScript.
 
-## Getting Started
+## Core Concepts: The Three-Phase Pipeline
 
-`s-val` helps you ensure that your data has the correct structure and type. You define a "schema" for your data, and the library handles the validation.
+`s-val` operates on a unique **three-phase validation pipeline** for every schema. This ensures a predictable and powerful validation process. When you call `parse()` or `safeParse()`, the data goes through these steps in order for the entire schema tree:
 
-All schemas are created using the `s` object.
+1.  **Preparation (`prepare`)**: The raw input is recursively traversed, and preparation functions are run. This is the ideal place to **coerce** data into the correct type _before_ validation, such as converting a date string to a `Date` object or trimming whitespace from a string.
+
+2.  **Validation (`validate`)**: The prepared data is recursively validated against the rules defined in your schema (e.g., `minLength`, `min`, `email`). If any validation fails, the process stops and throws an error that is caught by the top-level `parse` or `safeParse` call.
+
+3.  **Transformation (`transform`)**: After the data has been successfully validated, it is recursively transformed into its final output shape. This is useful for **formatting** data, such as adding a prefix, converting a `Date` object back to a formatted string, or creating a computed property.
+
+## Parsing Data
+
+Once you have a schema, you can validate your data using one of two methods: `parse()` or `safeParse()`. All validation is **asynchronous**.
+
+### `parse()`
+
+The `parse` method is best used when you expect validation to succeed but want an error thrown if it doesn't. It returns the fully prepared, validated, and transformed data. If validation fails at any point, it throws a `ValidationError`.
 
 ```typescript
 import { s } from "s-val";
 
-// Define a schema for a user object
-const userSchema = s.object({
-  properties: {
-    name: s.string({ minLength: 3 }),
-    email: s.string({ email: true }),
-    age: s.number({ min: 18 }),
-  },
+const schema = s.string({
+  prepare: { trim: true },
+  validate: { minLength: 5 },
 });
-```
-
-## Parsing Data
-
-Once you have a schema, you can validate your data using one of two methods: `parse()` or `safeParse()`.
-
-### `parse()`
-
-The `parse` method validates your data and throws a `ValidationError` if the data does not conform to the schema. If validation is successful, it returns the validated data.
-
-All validation is **asynchronous**, so you must `await` the result.
-
-```typescript
-const validUser = {
-  name: "John Doe",
-  email: "john.doe@example.com",
-  age: 30,
-};
-
-const invalidUser = {
-  name: "Jo",
-  email: "not-an-email",
-  age: 17,
-};
 
 try {
-  const validatedUser = await userSchema.parse(validUser);
-  console.log("Validation successful:", validatedUser);
+  const user = await schema.parse("  valid input  ");
+  console.log(user); // Output: "valid input"
 } catch (error) {
+  // This block will execute if validation fails.
   console.error("Validation failed:", error.issues);
-}
-
-try {
-  await userSchema.parse(invalidUser);
-} catch (error) {
-  // This will be caught
-  console.error("Validation failed:", error.issues);
-  // Output:
-  // [
-  //   { path: ['name'], message: 'Validation failed for string.minLength at path \'name\'' },
-  //   { path: ['email'], message: 'Validation failed for string.email at path \'email\'' },
-  //   { path: ['age'], message: 'Validation failed for number.min at path \'age\'' }
-  // ]
 }
 ```
 
@@ -70,16 +42,39 @@ try {
 If you prefer not to use `try...catch` blocks, `safeParse` is for you. It never throws an error. Instead, it returns a result object containing either the successfully parsed data or a `ValidationError` instance.
 
 ```typescript
-const result1 = await userSchema.safeParse(validUser);
+const result = await schema.safeParse("  no  ");
 
-if (result1.status === "success") {
-  console.log("Validation successful:", result1.data);
+if (result.status === "success") {
+  console.log("Success:", result.data);
+} else {
+  // result.status === "error"
+  console.error("Failure:", result.error.issues);
+  // Output:
+  // [ { path: [], message: 'Your input must contain at least 5 characters.' } ]
 }
+```
 
-const result2 = await userSchema.safeParse(invalidUser);
+## Customizing Error Messages
 
-if (result2.status === "error") {
-  console.error("Validation failed:", result2.error.issues);
+You can easily override the default error messages for any validator by providing a `messages` object in the schema configuration.
+
+```typescript
+const nameSchema = s.string({
+  validate: {
+    minLength: 5,
+    maxLength: 100,
+  },
+  messages: {
+    minLength: "Name is too short! Please use at least 5 characters.",
+    maxLength: "Name is too long! Maximum length is 100 characters.",
+  },
+});
+
+const result = await nameSchema.safeParse("abc");
+
+if (result.status === "error") {
+  console.log(result.error.issues[0].message);
+  // Output: "Name is too short! Please use at least 5 characters."
 }
 ```
 
@@ -128,7 +123,7 @@ const optionalAndNullable = s.string({ optional: true, nullable: true });
 You can create complex data structures by nesting schemas.
 
 - `s.object()`: Validates that a value is an object with a specific shape.
-- `s.array()`: Validates that a value is an array.
+- `s.array()`: Validates that a value is an array where each item matches a given schema.
 - `s.union()`: Validates that a value matches one of several possible schemas.
 - `s.switch()`: Validates against different schemas based on a key property.
 
@@ -146,7 +141,8 @@ const userSchema = s.object({
     name: s.string(),
     age: s.number(),
     isAdmin: s.boolean({ optional: true }),
-    tags: s.array({ of: s.string(), nullable: true }),
+    // Correct syntax for an array of strings
+    tags: s.array(s.string(), { nullable: true }),
   },
 });
 
@@ -169,7 +165,7 @@ const processUser = (user: User) => {
 const validUserData = {
   name: "Jane Doe",
   age: 42,
-  tags: null,
+  tags: ["admin", "editor"],
 };
 
 const validatedUser = await userSchema.parse(validUserData);
@@ -181,17 +177,6 @@ processUser(validatedUser); // This is type-safe!
 Now that you have the basics, you can dive deeper into the specific validators or learn how to create your own.
 
 - **[Validator Reference](./validators/index.md):** Detailed API for all built-in validators.
-
-  - [Any](./validators/any.md)
-  - [Array](./validators/array.md)
-  - [Boolean](./validators/boolean.md)
-  - [Date](./validators/date.md)
-  - [Number](./validators/number.md)
-  - [Object](./validators/object.md)
-  - [String](./validators/string.md)
-  - [Union](./validators/union.md)
-  - [Switch](./validators/switch.md)
-
 - **[Extensibility](./extensibility.md):** Learn how to create custom validators.
 
 ## Advanced Topics
