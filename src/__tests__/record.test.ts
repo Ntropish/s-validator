@@ -45,6 +45,7 @@ describe("Record Validator", () => {
     const schema = s.record(s.string(), s.any());
     await expect(schema.parse(null)).rejects.toThrow();
     await expect(schema.parse(undefined)).rejects.toThrow();
+    // @ts-expect-error - Testing runtime validation by passing an array where an object is expected.
     await expect(schema.parse([])).rejects.toThrow();
     // @ts-expect-error - Testing runtime validation by passing a primitive where an object is expected.
     await expect(schema.parse("a string")).rejects.toThrow();

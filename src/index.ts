@@ -1338,6 +1338,30 @@ class InstanceOfSchema<T extends new (...args: any) => any> extends Schema<
   }
 }
 
+class UnknownSchema extends Schema<unknown, unknown> {
+  constructor(config: Record<string, unknown> = {}) {
+    super(
+      "unknown",
+      config,
+      validatorMap as any,
+      preparationMap as any,
+      transformationMap as any
+    );
+  }
+}
+
+class NeverSchema extends Schema<never, never> {
+  constructor() {
+    super(
+      "never",
+      {},
+      validatorMap as any,
+      preparationMap as any,
+      transformationMap as any
+    );
+  }
+}
+
 class LiteralSchema<
   T extends string | number | boolean | null | undefined
 > extends Schema<T> {
@@ -1460,7 +1484,7 @@ class UnionSchema<
 }
 
 type CreateSchemaBuilder<TMap extends SchemaValidatorMap> = {
-  [K in keyof Omit<TMap, "object" | "array">]: <
+  [K in keyof Omit<TMap, "object" | "array" | "unknown" | "never">]: <
     C extends ValidatorConfig<TMap[K]>
   >(
     config?: C
@@ -1503,6 +1527,8 @@ type CreateSchemaBuilder<TMap extends SchemaValidatorMap> = {
   array<T extends Schema<any, any>>(
     config: ValidatorConfig<any> & { validate: { ofType: T } }
   ): ArraySchema<T>;
+  unknown(config?: Record<string, unknown>): UnknownSchema;
+  never(): NeverSchema;
 };
 
 function createSchemaFunction<
@@ -1541,7 +1567,13 @@ export function createSchemaBuilder<TMap extends SchemaValidatorMap>(
   const builder: any = {};
 
   for (const key in validatorMap) {
-    if (key === "object" || key === "array") continue;
+    if (
+      key === "object" ||
+      key === "array" ||
+      key === "unknown" ||
+      key === "never"
+    )
+      continue;
     builder[key] = createSchemaFunction(key, validatorMap as any);
   }
 
@@ -1601,6 +1633,10 @@ export function createSchemaBuilder<TMap extends SchemaValidatorMap>(
   ) => {
     return new InstanceOfSchema(constructorFn);
   };
+
+  builder.unknown = (config?: Record<string, unknown>) =>
+    new UnknownSchema(config);
+  builder.never = () => new NeverSchema();
 
   return builder;
 }

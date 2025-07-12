@@ -22,7 +22,9 @@ describe("Unknown and Never Validators", () => {
 
       // @ts-expect-error
       await expect(schema.parse("hello")).rejects.toThrow(ValidationError);
+      // @ts-expect-error
       await expect(schema.parse(null)).rejects.toThrow(ValidationError);
+      // @ts-expect-error
       await expect(schema.parse(undefined)).rejects.toThrow(ValidationError);
       await expect((schema as any).parse({})).rejects.toThrow(ValidationError);
     });

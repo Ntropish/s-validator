@@ -40,7 +40,6 @@ describe("Object Modifiers", () => {
     it("should still enforce types for provided properties", async () => {
       const partialSchema = baseSchema.partial();
 
-      // @ts-expect-error - Testing runtime validation by passing a number where a string is expected.
       await expect(partialSchema.parse({ name: 123 })).rejects.toThrow();
     });
   });
@@ -74,7 +73,6 @@ describe("Object Modifiers", () => {
 
     it("should still enforce types for picked properties", async () => {
       const pickedSchema = baseSchema.pick(["name"]);
-      // @ts-expect-error - Testing runtime validation by passing a number where a string is expected.
       await expect(pickedSchema.parse({ name: 123 })).rejects.toThrow();
     });
 
@@ -118,7 +116,6 @@ describe("Object Modifiers", () => {
     it("should still enforce types for remaining properties", async () => {
       const omittedSchema = baseSchema.omit(["email"]);
       await expect(
-        // @ts-expect-error - Testing runtime validation by passing a string where a number is expected.
         omittedSchema.parse({ name: "John", age: "30" })
       ).rejects.toThrow();
     });
@@ -176,7 +173,6 @@ describe("Object Modifiers", () => {
       await expect(extendedSchema.parse({ name: "John" })).rejects.toThrow();
       // Incorrect type for 'age'
       await expect(
-        // @ts-expect-error - Testing runtime validation by passing a string where a number is expected.
         extendedSchema.parse({ name: "John", age: "30" })
       ).rejects.toThrow();
     });
