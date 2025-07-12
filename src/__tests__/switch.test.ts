@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { s } from "../index.js";
-import { ValidationContext, Schema } from "../validators/types.js";
+import {
+  ValidationContext,
+  Schema,
+  ValidationError,
+} from "../validators/types.js";
 
 describe("Switch Validator", () => {
   describe("Practical Scenarios", () => {
@@ -60,9 +64,47 @@ describe("Switch Validator", () => {
       await expect(schema.parse(data as any)).resolves.toEqual(data);
     });
 
-    it("should use the default schema if no case matches", async () => {
+    it.only("should handle nested switch statements correctly", async () => {
+      const nestedSchema: Schema<any> = s.switch({
+        select: (c) => {
+          console.log(c);
+          return c.rootData.nestedKey;
+        },
+        cases: {
+          x: s.number({ validate: { min: 10 } }),
+          y: s.string({ validate: { minLength: 10 } }),
+        },
+        failOnNoMatch: true,
+      });
+
       const schema = s.switch({
         select: (c) => c.value.key,
+        cases: {
+          a: s.object({
+            validate: { properties: { value: nestedSchema } },
+          }),
+        },
+      });
+
+      // This should pass because the nested schema's min validation passes
+      await expect(
+        schema.parse({ key: "a", nestedKey: "x", value: 15 })
+      ).resolves.toEqual({ key: "a", nestedKey: "x", value: 15 });
+
+      // This should fail because the nested schema's min validation fails
+      await expect(
+        schema.parse({ key: "a", nestedKey: "x", value: 5 } as any)
+      ).rejects.toThrow(ValidationError);
+
+      // This should fail because the nested key 'z' is not a valid case
+      await expect(
+        schema.parse({ key: "a", nestedKey: "z", value: 5 } as any)
+      ).rejects.toThrow(ValidationError);
+    });
+
+    it("should use the default schema if no case matches", async () => {
+      const schema = s.switch({
+        select: (ctx) => (ctx.value as any).key,
         cases: {
           a: s.string({ validate: { minLength: 100 } }),
         },
@@ -94,47 +136,6 @@ describe("Switch Validator", () => {
       }); // Cast to any to allow for the unused 'b' case for testing purposes
       await expect(schema.parse("long")).resolves.toBe("long");
       await expect(schema.parse("s")).rejects.toThrow();
-    });
-
-    it("should handle nested switch statements correctly", async () => {
-      const nestedSchema: Schema<any> = s.switch({
-        select: (c) => (c.rootData as any).nestedKey, // check nestedKey on the root object
-        cases: {
-          x: s.number({ validate: { min: 10 } }),
-          y: s.string({ validate: { minLength: 10 } }),
-        },
-        default: s.any(),
-      });
-
-      const schema = s.switch({
-        select: (c) => c.value.key,
-        cases: {
-          a: s.object({
-            validate: { properties: { value: nestedSchema } },
-          }),
-        },
-        default: s.any(),
-      });
-
-      await expect(
-        schema.parse({ key: "a", nestedKey: "x", value: 15 } as any)
-      ).resolves.toEqual({ key: "a", nestedKey: "x", value: 15 });
-
-      await expect(
-        schema.parse({
-          key: "a",
-          nestedKey: "y",
-          value: "long string",
-        } as any)
-      ).resolves.toEqual({
-        key: "a",
-        nestedKey: "y",
-        value: "long string",
-      });
-
-      await expect(
-        schema.parse({ key: "a", nestedKey: "x", value: 5 } as any)
-      ).rejects.toThrow();
     });
   });
 });

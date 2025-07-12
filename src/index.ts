@@ -1,4 +1,3 @@
-// This is a test to confirm the editing process is working.
 import {
   validatorMap,
   preparationMap,
@@ -19,7 +18,6 @@ import {
   MessageProducer,
   MessageProducerContext,
 } from "./validators/types.js";
-import { SwitchConfig } from "./validators/switch.js";
 
 // A utility to force TS to expand a type in tooltips for better DX.
 type Prettify<T> = { [K in keyof T]: T[K] } & {};
@@ -66,6 +64,13 @@ type ValidatorConfig<VCollection> = {
     custom?: CustomValidator<any> | CustomValidator<any>[];
   };
   transform?: Record<string, any> & { custom?: ((value: any) => any)[] };
+};
+
+export type SwitchConfig = {
+  select: (context: ValidationContext) => any;
+  cases: Record<string | number, Schema<any, any>>;
+  default?: Schema<any, any>;
+  failOnNoMatch?: boolean;
 };
 
 type InferSchemaType<T extends Schema<any, any>> = T extends Schema<
@@ -414,6 +419,17 @@ export class Schema<TOutput, TInput = TOutput>
   }
 
   public async parse(data: TInput, ctx?: any): Promise<TOutput> {
+    const result = await this.safeParse(data, ctx);
+    if (result.status === "error") {
+      throw result.error;
+    }
+    return result.data;
+  }
+
+  public async safeParse(
+    data: TInput,
+    ctx?: any
+  ): Promise<SafeParseResult<TOutput>> {
     const context: ValidationContext = {
       rootData: data,
       path: [],
@@ -421,30 +437,35 @@ export class Schema<TOutput, TInput = TOutput>
       ctx: ctx,
     };
 
-    const preparedValue = await this._prepare(context);
-    const validatedValue = await this._validate(preparedValue, {
-      ...context,
-      value: preparedValue,
-    });
-    const transformedValue = await this._transform(validatedValue, {
-      ...context,
-      value: validatedValue,
-    });
-    return transformedValue;
-  }
-
-  public async safeParse(
-    data: TInput,
-    ctx?: any
-  ): Promise<SafeParseResult<TOutput>> {
     try {
-      const parsedData = await this.parse(data, ctx);
-      return { status: "success", data: parsedData };
-    } catch (e) {
-      if (e instanceof ValidationError) {
-        return { status: "error", error: e };
+      const preparedValue = await this._prepare(context);
+
+      const validatedValue = await this._validate(preparedValue, {
+        ...context,
+        value: preparedValue,
+      });
+
+      const transformedValue = await this._transform(validatedValue, {
+        ...context,
+        value: validatedValue,
+      });
+
+      return { status: "success", data: transformedValue };
+    } catch (error: any) {
+      if (error instanceof ValidationError) {
+        return { status: "error", error };
       }
-      throw e;
+
+      // Catch unexpected errors
+      return {
+        status: "error",
+        error: new ValidationError([
+          {
+            message: `Unhandled error in schema: ${error.message}`,
+            path: context.path,
+          },
+        ]),
+      };
     }
   }
 
@@ -479,6 +500,34 @@ class ObjectSchema<
     super("object", config);
   }
 
+  public async _prepare(context: ValidationContext): Promise<any> {
+    const preparedValue = await super._prepare(context);
+
+    if (
+      preparedValue === null ||
+      preparedValue === undefined ||
+      typeof preparedValue !== "object"
+    ) {
+      return preparedValue;
+    }
+
+    const shape = this.getProperties();
+    const newValue: Record<string, any> = { ...preparedValue };
+
+    for (const key in shape) {
+      if (Object.prototype.hasOwnProperty.call(newValue, key)) {
+        const propertySchema = shape[key];
+        newValue[key] = await propertySchema._prepare({
+          ...context,
+          value: newValue[key],
+          path: [...context.path, key],
+        });
+      }
+    }
+
+    return newValue;
+  }
+
   public async _validate(
     value: Record<string, any>,
     context: ValidationContext
@@ -499,31 +548,34 @@ class ObjectSchema<
     const issues: ValidationIssue[] = [];
     const newValue: Record<string, any> = {};
 
-    // Parse all child properties defined in the shape.
-    for (const key in shape) {
+    const propertyPromises = Object.keys(shape).map(async (key) => {
       const propertySchema = shape[key];
       const propertyValue = value[key];
+      const newContext = { ...context, path: [...context.path, key] };
 
-      if (Object.prototype.hasOwnProperty.call(value, key)) {
-        const result = await propertySchema.safeParse(propertyValue, {
-          ...context,
-          path: [...context.path, key],
-        });
-
-        if (result.status === "success") {
-          if (result.data !== undefined) {
-            newValue[key] = result.data;
-          }
-        } else {
-          issues.push(...result.error.issues);
+      try {
+        if (Object.prototype.hasOwnProperty.call(value, key)) {
+          const validatedValue = await propertySchema._validate(
+            propertyValue,
+            newContext
+          );
+          newValue[key] = validatedValue;
+        } else if (!propertySchema.config.optional) {
+          issues.push({
+            path: newContext.path,
+            message: `Required property '${key}' is missing`,
+          });
         }
-      } else if (!propertySchema.config.optional) {
-        issues.push({
-          path: [...context.path, key],
-          message: `Required property '${key}' is missing`,
-        });
+      } catch (error) {
+        if (error instanceof ValidationError) {
+          issues.push(...error.issues);
+        } else {
+          throw error;
+        }
       }
-    }
+    });
+
+    await Promise.all(propertyPromises);
 
     // Handle unrecognized keys in strict mode.
     if (strict) {
@@ -588,6 +640,29 @@ class ObjectSchema<
       throw new ValidationError(issues);
     }
 
+    return newValue;
+  }
+
+  public async _transform(
+    value: Record<string, any>,
+    context: ValidationContext
+  ): Promise<any> {
+    const transformedValue = await super._transform(value, context);
+    const shape = this.getProperties();
+    const newValue: Record<string, any> = { ...transformedValue };
+
+    const transformPromises = Object.keys(shape).map(async (key) => {
+      if (Object.prototype.hasOwnProperty.call(newValue, key)) {
+        const propertySchema = shape[key];
+        newValue[key] = await propertySchema._transform(newValue[key], {
+          ...context,
+          value: newValue[key],
+          path: [...context.path, key],
+        });
+      }
+    });
+
+    await Promise.all(transformPromises);
     return newValue;
   }
 
@@ -668,6 +743,104 @@ class ObjectSchema<
   }
 }
 
+class ArraySchema<
+  T extends Schema<any, any>,
+  TOutput = InferSchemaType<T>[]
+> extends Schema<TOutput> {
+  private itemSchema: T;
+
+  constructor(itemSchema: T, config: ValidatorConfig<any>) {
+    const newConfig = { ...config };
+    if ((newConfig.validate as any)?.ofType) {
+      delete (newConfig.validate as any).ofType;
+    }
+
+    super("array", newConfig);
+    this.itemSchema = itemSchema;
+  }
+
+  public async _prepare(context: ValidationContext): Promise<any> {
+    const preparedValue = await super._prepare(context);
+
+    if (!Array.isArray(preparedValue)) {
+      return preparedValue;
+    }
+
+    const preparedArray: any[] = [];
+    for (let i = 0; i < preparedValue.length; i++) {
+      const item = preparedValue[i];
+      const preparedItem = await this.itemSchema._prepare({
+        ...context,
+        value: item,
+        path: [...context.path, i],
+      });
+      preparedArray.push(preparedItem);
+    }
+
+    return preparedArray;
+  }
+
+  public async _validate(value: any[], context: ValidationContext) {
+    if (this.config.optional && value === undefined) {
+      return [];
+    }
+    if (this.config.nullable && value === null) {
+      return null;
+    }
+
+    await super._validate(value, context);
+
+    const issues: ValidationIssue[] = [];
+    const newArray: any[] = [];
+
+    const itemPromises = value.map(async (item, i) => {
+      const newContext = { ...context, path: [...context.path, i] };
+      try {
+        const validatedItem = await this.itemSchema._validate(item, newContext);
+        newArray[i] = validatedItem;
+      } catch (error) {
+        if (error instanceof ValidationError) {
+          issues.push(...error.issues);
+        } else {
+          throw error;
+        }
+      }
+    });
+
+    await Promise.all(itemPromises);
+
+    if (issues.length > 0) {
+      throw new ValidationError(issues);
+    }
+
+    return newArray;
+  }
+
+  public async _transform(
+    value: any[],
+    context: ValidationContext
+  ): Promise<any> {
+    const transformedValue = await super._transform(value, context);
+
+    if (!Array.isArray(transformedValue)) {
+      return transformedValue;
+    }
+
+    const newArray: any[] = [];
+
+    const itemPromises = transformedValue.map(async (item, i) => {
+      newArray[i] = await this.itemSchema._transform(item, {
+        ...context,
+        value: item,
+        path: [...context.path, i],
+      });
+    });
+
+    await Promise.all(itemPromises);
+    return newArray;
+  }
+}
+
 class SwitchSchema extends Schema<any> {
   constructor(config: SwitchConfig) {
     super("switch", config);
@@ -678,6 +851,7 @@ class SwitchSchema extends Schema<any> {
       select,
       cases,
       default: defaultSchema,
+      failOnNoMatch,
     } = this.config as SwitchConfig;
 
     if (!select || !cases) {
@@ -688,7 +862,20 @@ class SwitchSchema extends Schema<any> {
     const caseSchema = cases[key] || defaultSchema;
 
     if (caseSchema) {
-      return await caseSchema.parse(value, context);
+      const result = await caseSchema.safeParse(value, context);
+      if (result.status === "error") {
+        throw result.error;
+      }
+      return result.data;
+    }
+
+    if (failOnNoMatch) {
+      throw new ValidationError([
+        {
+          path: context.path,
+          message: `No case matched for key "${key}" and no default was provided.`,
+        },
+      ]);
     }
 
     return value;
@@ -706,6 +893,11 @@ type Builder = {
     P extends SValidator<any, infer TInput> ? TInput : never
   >;
 } & {
+  array<T extends Schema<any, any>>(
+    itemSchema: T,
+    config?: ValidatorConfig<any>
+  ): ArraySchema<T, InferSchemaType<T>[]>;
+  array(config?: ValidatorConfig<any>): ArraySchema<Schema<any, any>, any[]>;
   object<P extends SObjectProperties>(
     config: ValidatorConfig<any> & { validate?: { properties?: P } }
   ): ObjectSchema<P, InferSObjectType<P>>;
@@ -728,6 +920,22 @@ function createSchemaBuilder(): Builder {
 
   for (const plugin of plugins) {
     if (plugin.dataType === "switch") continue;
+    if (plugin.dataType === "array") {
+      builder.array = <T extends Schema<any, any>>(
+        itemSchemaOrConfig?: T | ValidatorConfig<any>,
+        config: ValidatorConfig<any> = {}
+      ) => {
+        if (itemSchemaOrConfig instanceof Schema) {
+          return new ArraySchema(itemSchemaOrConfig, config);
+        }
+
+        const configObj = itemSchemaOrConfig ?? {};
+        const itemSchema =
+          (configObj as any)?.validate?.ofType ?? new Schema("any");
+        return new ArraySchema(itemSchema, configObj);
+      };
+      continue;
+    }
     if (plugin.dataType === "object") {
       builder.object = <P extends SObjectProperties>(
         config: ValidatorConfig<any> & { validate?: { properties?: P } }
