@@ -32,7 +32,9 @@ describe("Validation", () => {
 
   it("should use custom error messages when provided", async () => {
     const schema = s.string({
-      minLength: 5,
+      validate: {
+        minLength: 5,
+      },
       messages: {
         minLength: "String must be at least 5 characters long",
       },

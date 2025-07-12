@@ -8,6 +8,7 @@ import { regex as zodRegex } from "./zod-regex";
  */
 export const regex = {
   ...zodRegex,
+  cuid2: /^[a-z][a-z0-9]{7,31}$/,
   /**
    * ULID v7, with millisecond precision.
    *

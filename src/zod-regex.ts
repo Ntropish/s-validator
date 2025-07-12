@@ -56,10 +56,6 @@ export const regex = {
    * @see https://github.com/colinhacks/zod/blob/master/src/types.ts#L446
    */
   cuid: /^c[a-z0-9]{24}$/i,
-  /**
-   * @see https://github.com/colinhacks/zod/blob/master/src/types.ts#L457
-   */
-  cuid2: /^[a-z][a-z0-9]*$/,
   ulid: /^[0-9A-HJKMNP-TV-Z]{26}$/i,
   /**
    * @see https://github.com/colinhacks/zod/blob/master/src/types.ts#L343

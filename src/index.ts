@@ -175,12 +175,15 @@ export class Schema<TOutput, TInput = TOutput>
     }
 
     if (validate) {
-      for (const [valName, valConfig] of Object.entries(validate)) {
+      for (let [valName, valConfig] of Object.entries(validate)) {
         if (valName === "custom") {
           this.customValidators = Array.isArray(valConfig)
             ? valConfig
             : [valConfig];
           continue;
+        }
+        if (valConfig === undefined) {
+          valConfig = true;
         }
         if (validatorCollection?.[valName]) {
           this.validators.push({
@@ -271,7 +274,7 @@ export class Schema<TOutput, TInput = TOutput>
     }
   }
 
-  protected async _parse(context: ValidationContext): Promise<TOutput> {
+  public async _parse(context: ValidationContext): Promise<TOutput> {
     // Run preparations
     let current_value: any = context.value;
     for (const { preparation, args } of this.preparations) {
@@ -319,7 +322,9 @@ export class Schema<TOutput, TInput = TOutput>
         path: context.path,
         message:
           messages.identity ??
-          `Expected type ${this.dataType}, found ${typeof current_value}`,
+          `Invalid type. Expected ${
+            this.dataType
+          }, received ${typeof current_value}.`,
       });
       // If identity fails, no point in running other validators
       throw new ValidationError(issues);
@@ -414,7 +419,7 @@ class ObjectSchema<
     super("object", config, validatorMap, preparationMap, transformationMap);
   }
 
-  protected async _parse(context: ValidationContext): Promise<T> {
+  public async _parse(context: ValidationContext): Promise<T> {
     // Run preparations on the object itself.
     let current_value: any = context.value;
     for (const { preparation, args } of this.preparations) {
@@ -476,11 +481,23 @@ class ObjectSchema<
 
       if (schema) {
         try {
-          const parsedValue = await schema.parse({
+          const parsedValue = await (schema as any).parse({
             ...context,
             path: [...context.path, key],
             value: current_value[key],
           });
+          if (
+            parsedValue === undefined &&
+            !(schema.config as any).optional &&
+            !Object.prototype.hasOwnProperty.call(current_value, key)
+          ) {
+            issues.push({
+              path: [...context.path, key],
+              message: "Required property is missing",
+            });
+            continue;
+          }
+
           if (parsedValue !== undefined) {
             newObject[key] = parsedValue;
           }
@@ -637,10 +654,15 @@ class ArraySchema<T extends Schema<any, any>> extends Schema<
   Array<s.infer<T>>
 > {
   private itemSchema: T;
+  private tupleSchemas?: Schema<any, any>[];
 
-  constructor(config: ValidatorConfig<any> & { validate: { ofType?: T } }) {
+  constructor(
+    config: ValidatorConfig<any> & { validate: { ofType?: T; items?: any } }
+  ) {
     super("array", config, validatorMap, preparationMap, transformationMap);
-    const { validate } = config as { validate?: { ofType?: T } };
+    const { validate } = config as {
+      validate?: { ofType?: T; items?: Schema<any, any>[] };
+    };
     if (!validate || !validate.ofType) {
       // This should not happen with proper static typing, but as a safeguard:
       throw new Error(
@@ -648,11 +670,12 @@ class ArraySchema<T extends Schema<any, any>> extends Schema<
       );
     }
     this.itemSchema = validate.ofType;
+    if (validate.items) {
+      this.tupleSchemas = validate.items;
+    }
   }
 
-  protected async _parse(
-    context: ValidationContext
-  ): Promise<Array<s.infer<T>>> {
+  public async _parse(context: ValidationContext): Promise<Array<s.infer<T>>> {
     let current_value: any = context.value;
 
     // Run array-level preparations
@@ -716,18 +739,15 @@ class ArraySchema<T extends Schema<any, any>> extends Schema<
     let finalValue: any = newArray;
 
     // Handle tuple validation if 'items' is present
-    const tupleSchemas = this.validators.find((v) => v.name === "items")
-      ?.args[0] as Schema<any, any>[] | undefined;
-
-    if (tupleSchemas) {
-      if (current_value.length !== tupleSchemas.length) {
+    if (this.tupleSchemas) {
+      if (current_value.length !== this.tupleSchemas.length) {
         issues.push({
           path: context.path,
-          message: `Expected a tuple of length ${tupleSchemas.length}, but received ${current_value.length}.`,
+          message: `Expected a tuple of length ${this.tupleSchemas.length}, but received ${current_value.length}.`,
         });
       } else {
-        for (let i = 0; i < tupleSchemas.length; i++) {
-          const itemSchema = tupleSchemas[i];
+        for (let i = 0; i < this.tupleSchemas.length; i++) {
+          const itemSchema = this.tupleSchemas[i];
           const item = current_value[i];
           try {
             const parsedItem = await itemSchema.parse({
@@ -814,7 +834,7 @@ class RecordSchema<
     this.valueSchema = valueSchema;
   }
 
-  protected async _parse(
+  public async _parse(
     context: ValidationContext
   ): Promise<Record<s.infer<K>, s.infer<V>>> {
     let current_value: any = context.value;
@@ -915,7 +935,7 @@ class SwitchSchema<
     this.defaultSchema = defaultSchema;
   }
 
-  protected async _parse(context: ValidationContext): Promise<any> {
+  public async _parse(context: ValidationContext): Promise<any> {
     const key = this.keyFn(context);
     const schema = this.schemas[key] || this.defaultSchema;
 
@@ -945,7 +965,7 @@ class MapSchema<
     this.valueSchema = valueSchema;
   }
 
-  protected async _parse(
+  public async _parse(
     context: ValidationContext
   ): Promise<Map<InferSchemaType<K>, InferSchemaType<V>>> {
     if (!(context.value instanceof Map)) {
@@ -995,7 +1015,7 @@ class SetSchema<V extends Schema<any, any>> extends Schema<
     this.valueSchema = valueSchema;
   }
 
-  protected async _parse(
+  public async _parse(
     context: ValidationContext
   ): Promise<Set<InferSchemaType<V>>> {
     if (!(context.value instanceof Set)) {
@@ -1036,7 +1056,7 @@ class InstanceOfSchema<T extends new (...args: any) => any> extends Schema<
     this.constructorFn = constructorFn;
   }
 
-  protected async _parse(context: ValidationContext): Promise<InstanceType<T>> {
+  public async _parse(context: ValidationContext): Promise<InstanceType<T>> {
     if (context.value instanceof this.constructorFn) {
       return context.value;
     }
@@ -1065,7 +1085,7 @@ class LiteralSchema<
     this.literal = literal;
   }
 
-  protected async _parse(context: ValidationContext): Promise<T> {
+  public async _parse(context: ValidationContext): Promise<T> {
     if (context.value === this.literal) {
       return context.value as T;
     }
@@ -1094,7 +1114,7 @@ class UnionSchema<
     this.schemas = schemas;
   }
 
-  protected async _parse(
+  public async _parse(
     context: ValidationContext
   ): Promise<InferSchemaType<T[number]>> {
     const issues: ValidationIssue[] = [];
