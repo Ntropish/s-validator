@@ -44,13 +44,13 @@ describe("Advanced Type Validators", () => {
 
   describe("instanceof", () => {
     it("should validate a correct class instance", async () => {
-      const schema = s.instanceof(TestClass);
+      const schema = s.instanceof({ validate: { identity: TestClass } });
       const instance = new TestClass();
       await expect(schema.parse(instance)).resolves.toBe(instance);
     });
 
     it("should throw for an incorrect class instance", async () => {
-      const schema = s.instanceof(TestClass);
+      const schema = s.instanceof({ validate: { identity: TestClass } });
       await expect((schema as any).parse({})).rejects.toThrow(ValidationError);
     });
   });

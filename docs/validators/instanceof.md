@@ -4,7 +4,7 @@ The `instanceof` validator checks if a value is an instance of a given class.
 
 ## Usage
 
-`s.instanceof()` takes one argument: the class constructor.
+You pass the class constructor inside a configuration object.
 
 ```typescript
 import { s } from "s-val";
@@ -12,7 +12,7 @@ import { s } from "s-val";
 class TestClass {}
 class AnotherClass {}
 
-const schema = s.instanceof(TestClass);
+const schema = s.instanceof({ validate: { identity: TestClass } });
 
 const instance = new TestClass();
 await schema.parse(instance); // ✅

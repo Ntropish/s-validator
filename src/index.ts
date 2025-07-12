@@ -1285,61 +1285,21 @@ class SetSchema<V extends Schema<any, any>> extends Schema<
     value: any,
     context: ValidationContext
   ): Promise<Set<InferSchemaType<V>>> {
-    if (!(value instanceof Set)) {
-      return value;
+    if (!this.customTransformations.length) {
+      return value as Set<InferSchemaType<V>>;
     }
-
-    const newSet = new Set<InferSchemaType<V>>();
-    for (const val of value.values()) {
-      const valueContext = {
-        ...context,
-        value: val,
-        path: [...context.path, val],
-      };
-      newSet.add(await this.valueSchema._transform(val, valueContext));
+    let current_value = value;
+    for (const transform of this.customTransformations) {
+      current_value = await transform(current_value, [], context, this);
     }
-
-    return super._transform(newSet, { ...context, value: newSet }) as any;
+    return current_value;
   }
 
   public optional(): Schema<Set<InferSchemaType<V>> | undefined> {
-    return new SetSchema(this.valueSchema) as any;
+    return new SetSchema(this.valueSchema).optional();
   }
-
   public nullable(): Schema<Set<InferSchemaType<V>> | null> {
-    return new SetSchema(this.valueSchema) as any;
-  }
-}
-
-class InstanceOfSchema<T extends new (...args: any) => any> extends Schema<
-  InstanceType<T>
-> {
-  private constructorFn: T;
-
-  constructor(constructorFn: T) {
-    super(
-      "instanceof",
-      {},
-      validatorMap as any,
-      preparationMap as any,
-      transformationMap as any
-    );
-    this.constructorFn = constructorFn;
-  }
-
-  public async _validate(
-    value: any,
-    context: ValidationContext
-  ): Promise<void> {
-    await super._validate(value, context);
-  }
-
-  public optional(): Schema<InstanceType<T> | undefined> {
-    return new InstanceOfSchema(this.constructorFn) as any;
-  }
-
-  public nullable(): Schema<InstanceType<T> | null> {
-    return new InstanceOfSchema(this.constructorFn) as any;
+    return new SetSchema(this.valueSchema).nullable();
   }
 }
 
@@ -1348,7 +1308,7 @@ class UnknownSchema extends Schema<unknown, unknown> {
     super(
       "unknown",
       config,
-      validatorMap as any,
+      { unknown: { identity: (v: any): v is unknown => true } },
       preparationMap as any,
       transformationMap as any
     );
@@ -1527,8 +1487,8 @@ type CreateSchemaBuilder<TMap extends SchemaValidatorMap> = {
   ): MapSchema<K, V>;
   set<V extends Schema<any, any>>(valueSchema: V): SetSchema<V>;
   instanceof<T extends new (...args: any) => any>(
-    constructorFn: T
-  ): InstanceOfSchema<T>;
+    config: ValidatorConfig<any> & { validate: { identity: T } }
+  ): Schema<InstanceType<T>>;
   array<T extends Schema<any, any>>(
     config: ValidatorConfig<any> & { validate: { ofType: T } }
   ): ArraySchema<T>;
@@ -1634,9 +1594,15 @@ export function createSchemaBuilder<TMap extends SchemaValidatorMap>(
   };
 
   builder.instanceof = <T extends new (...args: any) => any>(
-    constructorFn: T
-  ) => {
-    return new InstanceOfSchema(constructorFn);
+    config: ValidatorConfig<any> & { validate: { identity: T } }
+  ): Schema<InstanceType<T>> => {
+    return new Schema(
+      "instanceof",
+      config,
+      validatorMap,
+      preparationMap,
+      transformationMap
+    );
   };
 
   builder.unknown = (config?: Record<string, unknown>) =>
