@@ -10,29 +10,46 @@ import { s } from "s-val";
 const schema = s.string();
 
 await schema.parse("hello"); // -> "hello"
-await schema.parse(123); // -> throws ValidationError
+
+try {
+  await schema.parse(123); // -> throws ValidationError
+} catch (e) {
+  console.log(e.issues);
+}
 ```
 
-## Usage
+## Preparation
 
-You can pass a configuration object to `s.string()` to specify validation rules. All validation properties are optional.
+Use the `prepare` object to modify the string _before_ it is validated.
+
+| Property      | Description                         |
+| ------------- | ----------------------------------- |
+| `trim`        | Trims whitespace from both ends.    |
+| `toLowerCase` | Converts the string to lowercase.   |
+| `toUpperCase` | Converts the string to uppercase.   |
+| `toNull`      | Converts an empty string to `null`. |
+
+**Example:**
 
 ```typescript
-// A string that must be a valid email and have a max length of 100.
 const emailSchema = s.string({
+  prepare: {
+    trim: true,
+    toLowerCase: true,
+  },
   validate: {
     email: true,
-    maxLength: 100,
   },
 });
 
-await emailSchema.parse("test@example.com"); // ✅
-await emailSchema.parse("not-an-email"); // ❌
+// The input is trimmed and lowercased before validation.
+const result = await emailSchema.parse("  TEST@EXAMPLE.COM  ");
+console.log(result); // -> "test@example.com"
 ```
 
-## Validation Properties
+## Validation
 
-All validation rules are passed inside a `validate` property in the configuration object.
+All validation rules are passed inside a `validate` object in the configuration.
 
 ### Length and Range
 
@@ -42,25 +59,10 @@ All validation rules are passed inside a `validate` property in the configuratio
 - `range: [min: number, max: number]`: Checks if the string's length is within an inclusive range.
 - `exclusiveRange: [min: number, max: number]`: Checks if the string's length is within an exclusive range.
 
-**Example:**
-
-```typescript
-await s.string({ validate: { minLength: 3 } }).parse("abc"); // ✅
-await s.string({ validate: { range: [3, 5] } }).parse("abcd"); // ✅
-await s.string({ validate: { range: [3, 5] } }).parse("ab"); // ❌
-```
-
 ### Patterns and Content
 
 - `pattern: RegExp`: Checks if the string matches a regular expression.
 - `oneOf: string[]`: Checks if the string is one of the specified options.
-
-**Example:**
-
-```typescript
-await s.string({ validate: { pattern: /^[a-z]+$/ } }).parse("abc"); // ✅
-await s.string({ validate: { oneOf: ["admin", "user"] } }).parse("user"); // ✅
-```
 
 ### Format Validators
 
@@ -109,6 +111,33 @@ await s
   .parse("test@example.com"); // ❌
 ```
 
+## Transformation
+
+Use the `transform` object to modify the string _after_ it has been validated.
+
+**Example: Adding a prefix**
+
+```typescript
+const handleSchema = s.string({
+  prepare: {
+    trim: true,
+    toLowerCase: true,
+  },
+  validate: {
+    pattern: /^[a-z0-9_]+$/,
+    minLength: 3,
+  },
+  transform: {
+    custom: (value) => `@${value}`,
+  },
+});
+
+const handle = await handleSchema.parse("  MyHandle_123  ");
+console.log(handle); // -> "@myhandle_123"
+```
+
+## Advanced Validators
+
 ### JSON Schema
 
 The `json` validator checks if a string is a valid JSON string that also conforms to a nested schema.
@@ -119,7 +148,9 @@ The `json` validator checks if a string is a valid JSON string that also conform
 const userJsonSchema = s.string({
   validate: {
     json: s.object({
-      properties: { name: s.string() },
+      validate: {
+        properties: { name: s.string() },
+      },
     }),
   },
 });

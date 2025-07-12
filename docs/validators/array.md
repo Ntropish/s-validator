@@ -4,37 +4,54 @@ The `array` validator checks if a value is an array and can validate its content
 
 ## Usage
 
-You can pass a configuration object to `s.array()` to specify validation rules.
+You create an array schema by passing a single configuration object to `s.array()`. All validation rules, including the schema for the array's items, must be placed inside a `validate` object within this configuration.
+
+- `validate.ofType`: The schema to use for validating each element in the array. This is the most important property.
 
 ```typescript
 import { s } from "s-val";
 
-// An array of strings that must contain at least one element.
-const schema = s.array({
-  of: s.string(),
-  nonEmpty: true,
+// An array where all items must be strings.
+const stringArraySchema = s.array({
+  validate: {
+    ofType: s.string(),
+  },
 });
 
-await schema.parse(["hello", "world"]); // ✅
-await schema.parse([]); // ❌
-await schema.parse(["hello", 123]); // ❌
+await stringArraySchema.parse(["hello", "world"]); // ✅
+
+try {
+  // This fails because the second item is a number.
+  await stringArraySchema.parse(["hello", 123]); // ❌
+} catch (e) {
+  console.log(e.issues);
+}
 ```
 
-## Configuration Properties
+## Validation Rules
 
-### `of`
+All validation rules are placed within the `validate` object.
 
-Checks if every element in the array matches the provided `schema`.
+### `items` (For Tuples)
 
-- **Type**: `Schema`
-- **Example**: `s.array({ of: s.string() })`
-
-### `items`
-
-Checks if the array's elements match the `schemas` provided, in order. This is used for validating tuples. The array must have the same number of elements as the `schemas` array.
+To validate an array with a specific sequence of types (a tuple), use the `items` property. The array must have the same number of elements as the provided `schemas` array. If you use `items`, you should also provide a base `ofType` schema (like `s.any()`) for the initial type check.
 
 - **Type**: `Schema[]`
-- **Example**: `s.array({ items: [s.string(), s.number()] })`
+- **Example**: `s.array({ validate: { ofType: s.any(), items: [s.string(), s.number()] } })`
+
+```typescript
+// A tuple of [string, number]
+const tupleSchema = s.array({
+  validate: {
+    ofType: s.any(),
+    items: [s.string(), s.number()],
+  },
+});
+
+await tupleSchema.parse(["hello", 123]); // ✅
+await tupleSchema.parse(["hello", "world"]); // ❌ (second item must be a number)
+await tupleSchema.parse(["hello"]); // ❌ (must have exactly 2 items)
+```
 
 ### Length Validation
 
@@ -48,9 +65,11 @@ Checks if the array's elements match the `schemas` provided, in order. This is u
 ```typescript
 // An array that must contain between 2 and 4 numbers.
 const schema = s.array({
-  of: s.number(),
-  minLength: 2,
-  maxLength: 4,
+  validate: {
+    ofType: s.number(),
+    minLength: 2,
+    maxLength: 4,
+  },
 });
 
 await schema.parse([1, 2]); // ✅
@@ -61,18 +80,20 @@ await schema.parse([1, 2, 3, 4, 5]); // ❌
 
 ### Content Validation
 
-- `contains: any | any[]`: Checks if the array contains at least one of the specified elements.
-- `excludes: any | any[]`: Checks if the array does not contain any of the specified elements.
+- `contains: any`: Checks if the array contains the specified element.
+- `excludes: any`: Checks if the array does not contain the specified element.
 - `unique: boolean`: Checks if all elements in the array are unique.
 
 **Example:**
 
 ```typescript
 const schema = s.array({
-  of: s.string(),
-  contains: "a",
-  excludes: "d",
-  unique: true,
+  validate: {
+    ofType: s.string(),
+    contains: "a",
+    excludes: "d",
+    unique: true,
+  },
 });
 
 await schema.parse(["a", "b", "c"]); // ✅

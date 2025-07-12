@@ -1,100 +1,100 @@
-# Extensibility: Creating Custom Validators
+# Extensibility: Creating Custom Schemas
 
-`s-val` is designed to be fully extensible. You can add your own custom validation logic by creating plugins. This allows you to encapsulate and reuse your validation rules, keeping your code clean and modular.
+`s-val` is designed to be fully extensible. While the built-in validators cover most common use cases, you may have custom validation logic that you want to encapsulate and reuse. The best way to do this is by creating your own schema class that extends the base `s.Schema`.
 
-## The Plugin Architecture
+## The `Schema` Class
 
-At its core, `s-val` is a collection of plugins. Each validator, like `s.string()` or `s.number()`, is a self-contained plugin. A plugin is an object that can provide three key pieces of functionality:
+The `s.Schema` class is the foundation for all validators in `s-val`. By extending it, you can create a new validator with its own `_validate` and `_transform` logic, while inheriting all the powerful features of the base schema, like `.optional()`, `.nullable()`, custom messages, and more.
 
-1.  **Preparation**: A function that runs _before_ validation to modify the input value. This is useful for coercion, like converting a string to a `Date` object.
-2.  **Validator**: The core validation function that checks the input and returns a `ValidationIssue` if it fails.
-3.  **Transformation**: A function that runs _after_ successful validation to transform the output value.
+## Example: Creating a `PhoneNumberSchema`
 
-A single plugin can contain multiple validators, preparations, or transformations.
+Let's create a custom schema that validates and formats a US phone number. We want it to:
 
-## The `Plugin` Type
+1. Accept a 10-digit string.
+2. Format it into a standard `(XXX) XXX-XXXX` string.
 
-Here is the TypeScript interface for a plugin:
+### 1. Define the Custom Schema Class
+
+Create a new file, for example, `phone-number-schema.ts`. In this file, you'll define your new schema class.
 
 ```typescript
-export type Plugin<TName extends string, T extends Validator> = {
-  name: TName;
-  preparations?: PreparationMap;
-  validators: ValidatorMap<T>;
-  transformations?: TransformationMap;
-};
+import { s, type ValidationContext, type ValidationError } from "s-val";
+
+const PHONE_REGEX = /^\d{10}$/;
+
+export class PhoneNumberSchema extends s.Schema<string, string> {
+  constructor() {
+    // The first argument is the data type name, used in error messages.
+    super("phoneNumber");
+  }
+
+  // The _validate method checks the input after basic type checks.
+  async _validate(value: any, context: ValidationContext): Promise<any> {
+    // First, run the base validation from s.Schema (handles optional, nullable, etc.)
+    await super._validate(value, context);
+
+    if (typeof value !== "string" || !PHONE_REGEX.test(value)) {
+      throw new s.ValidationError([
+        {
+          path: context.path,
+          message: "Must be a 10-digit phone number.",
+        },
+      ]);
+    }
+  }
+
+  // The _transform method runs after successful validation.
+  async _transform(value: string, context: ValidationContext): Promise<string> {
+    const transformedValue = await super._transform(value, context);
+
+    // Format the 10-digit string into a standard format.
+    return `(${transformedValue.slice(0, 3)}) ${transformedValue.slice(
+      3,
+      6
+    )}-${transformedValue.slice(6)}`;
+  }
+}
 ```
 
-- `name`: A unique name for your plugin (e.g., "myCustomPlugin").
-- `preparations`: An optional map of preparation functions.
-- `validators`: A map of validator functions and their associated error messages.
-- `transformations`: An optional map of transformation functions.
+### 2. Create an Instance Function
 
-## Example: Creating a `UUID` Validator
+For a better developer experience, it's a good practice to create a small factory function that creates an instance of your new schema. This makes it feel like a built-in `s-val` validator.
 
-Let's create a custom plugin that adds a `uuid` validator to strings.
-
-### 1. Define the Plugin
-
-First, create a new file for your plugin, for example, `uuid-plugin.ts`. In this file, you'll define the plugin object.
+You can add this to the same file or a central export file.
 
 ```typescript
-import { s, type Plugin } from "s-val";
+// phoneNumber-schema.ts (continued)
 
-// A simple regex to validate a UUID
-const UUID_REGEX =
-  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-
-export const uuidPlugin = {
-  name: "uuid",
-  validators: {
-    string: {
-      uuid: (value, { path }) => {
-        if (typeof value !== "string" || !UUID_REGEX.test(value)) {
-          return {
-            path,
-            message: (ctx) => `Expected a UUID, but received ${ctx.value}`,
-          };
-        }
-      },
-    },
-  },
-} satisfies Plugin<"uuid", typeof s.string>;
+export function phoneNumber() {
+  return new PhoneNumberSchema();
+}
 ```
 
-**Explanation:**
+### 3. Use Your New Schema
 
-- We define a plugin named `'uuid'`.
-- We are augmenting the existing `string` validator.
-- We add a new validation rule called `uuid`.
-- The `uuid` function checks if the `value` is a string that matches our `UUID_REGEX`.
-- If the validation fails, it returns a `ValidationIssue` object with a dynamic `message`. The message is a `MessageProducer` function that receives the validation context (`ctx`).
-
-### 2. Add the Plugin
-
-To make your custom plugin available, you need to add it to the `createSchemaBuilder`. In your main setup file (e.g. `index.ts` where you configure `s-val`):
+Now you can import and use your custom `phoneNumber` schema just like any other `s-val` validator.
 
 ```typescript
-import { createSchemaBuilder, type Plugin } from "s-val";
-import { stringPlugin } from "s-val/validators/string"; // core plugin
-import { uuidPlugin } from "./uuid-plugin"; // your custom plugin
+import { phoneNumber } from "./phoneNumber-schema";
 
-const allPlugins = [stringPlugin, uuidPlugin] as const;
-
-export const s = createSchemaBuilder(allPlugins);
-
-// Now you can use it!
-const schema = s.string({
+const userSchema = s.object({
   validate: {
-    uuid: true,
+    properties: {
+      name: s.string(),
+      // Use your custom schema!
+      phone: phoneNumber(),
+    },
   },
 });
 
-// This will pass
-await schema.parse("f47ac10b-58cc-4372-a567-0e02b2c3d479");
+const user = {
+  name: "John Doe",
+  phone: "1234567890",
+};
 
-// This will fail
-await schema.parse("not-a-uuid");
+const validatedUser = await userSchema.parse(user);
+
+console.log(validatedUser.phone); // -> "(123) 456-7890"
 ```
 
-By adding your plugin to the schema builder, you've seamlessly extended `s-val` with your own custom logic. This approach keeps your validation rules organized and makes them easy to test and reuse across your application.
+By extending the `s.Schema` class, you can create powerful, reusable, and type-safe validators that are seamlessly integrated into the `s-val` ecosystem.

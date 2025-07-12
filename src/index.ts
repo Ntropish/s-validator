@@ -17,6 +17,8 @@ import { ValidatorConfig, Validator } from "./types.js";
 import { Schema } from "./schemas/schema.js";
 import { ArraySchema } from "./schemas/array.js";
 import { ObjectSchema } from "./schemas/object.js";
+import { SetSchema } from "./schemas/set.js";
+import { UnionSchema } from "./schemas/union.js";
 export { SwitchSchema };
 
 type Builder = {
@@ -48,7 +50,12 @@ type Builder = {
     keySchema: Schema<any, any>,
     valueSchema: Schema<any, any>
   ): Schema<Map<any, any>>;
-  set(itemSchema: Schema<any, any>): Schema<Set<any>>;
+  set<T extends Schema<any, any>>(
+    config?: ValidatorConfig<any> & { validate?: { ofType?: T } }
+  ): SetSchema<T, Set<InferSchemaType<T>>>;
+  union<T extends readonly [Schema<any, any>, ...Schema<any, any>[]]>(
+    config?: ValidatorConfig<any> & { validate?: { variants?: T } }
+  ): UnionSchema<T, InferSchemaType<T[number]>>;
   instanceof(constructor: new (...args: any[]) => any): Schema<any>;
 };
 
@@ -108,10 +115,12 @@ function createSchemaBuilder(): Builder {
       continue;
     }
     if (plugin.dataType === "set") {
-      builder.set = (itemSchema: Schema<any, any>) => {
-        return new Schema("set", {
-          validate: { items: itemSchema },
-        });
+      builder.set = <T extends Schema<any, any>>(
+        config: ValidatorConfig<any> = {}
+      ) => {
+        const itemSchema =
+          (config as any)?.validate?.ofType ?? new Schema("any");
+        return new SetSchema(itemSchema, config);
       };
       continue;
     }
@@ -120,6 +129,17 @@ function createSchemaBuilder(): Builder {
         return new Schema("instanceof", {
           validate: { constructor: constructor },
         });
+      };
+      continue;
+    }
+    if (plugin.dataType === "union") {
+      builder.union = <
+        T extends readonly [Schema<any, any>, ...Schema<any, any>[]]
+      >(
+        config: ValidatorConfig<any> & { validate?: { variants?: T } } = {}
+      ) => {
+        const variants = (config as any)?.validate?.variants ?? [];
+        return new UnionSchema(variants, config);
       };
       continue;
     }

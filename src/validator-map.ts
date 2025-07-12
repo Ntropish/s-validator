@@ -10,12 +10,12 @@ import { nanPlugin } from "./validators/nan.js";
 import { neverPlugin } from "./validators/never.js";
 import { numberPlugin } from "./validators/number.js";
 import { objectPlugin } from "./validators/object.js";
-import { setPlugin } from "./validators/set.js";
 import { stringPlugin } from "./validators/string.js";
 import { unknownPlugin } from "./validators/unknown.js";
 import { literalPlugin } from "./validators/literal.js";
 import { unionPlugin } from "./validators/union.js";
 import { recordPlugin } from "./validators/record.js";
+import { setPlugin } from "./validators/set.js";
 
 export const plugins: Validator<any, any>[] = [
   anyPlugin,
@@ -31,10 +31,10 @@ export const plugins: Validator<any, any>[] = [
   numberPlugin,
   objectPlugin,
   recordPlugin,
-  setPlugin,
   stringPlugin,
   unionPlugin,
   unknownPlugin,
+  setPlugin,
 ];
 
 export const validatorMap: SchemaValidatorMap = {};

@@ -1,47 +1,58 @@
 # Literal Validator
 
-The `literal` validator checks if a value is strictly equal to a specific primitive value.
+The `literal` validator checks if a value is strictly equal (`===`) to a specific primitive value.
 
 ## Usage
 
-You pass the literal value inside the `validate.identity` property of the configuration object.
+You pass the literal value directly to the `s.literal()` method.
 
 ```typescript
 import { s } from "s-val";
 
 // Check for a specific string
-const statusSchema = s.literal({ validate: { identity: "success" } });
+const statusSchema = s.literal("success");
 await statusSchema.parse("success"); // ✅
-await statusSchema.parse("error"); // ❌
+
+try {
+  await statusSchema.parse("error"); // ❌
+} catch (e) {
+  console.log(e.issues);
+}
 
 // Check for a specific number
-const versionSchema = s.literal({ validate: { identity: 2 } });
+const versionSchema = s.literal(2);
 await versionSchema.parse(2); // ✅
-await versionSchema.parse(3); // ❌
 
 // Check for a specific boolean
-const trueSchema = s.literal({ validate: { identity: true } });
+const trueSchema = s.literal(true);
 await trueSchema.parse(true); // ✅
-await trueSchema.parse(false); // ❌
 ```
 
-This is especially useful for creating discriminated unions with `s.switch()` or `s.union()`.
+This is especially useful for creating discriminated unions with `s.switch()`.
 
 ```typescript
-const clickEvent = s.object({
-  properties: {
-    type: s.literal({ validate: { identity: "click" } }),
-    x: s.number(),
-    y: s.number(),
+import { s } from "s-val";
+
+const eventSchema = s.switch({
+  select: (ctx) => ctx.value.type,
+  cases: {
+    click: s.object({
+      validate: {
+        properties: {
+          type: s.literal("click"),
+          x: s.number(),
+          y: s.number(),
+        },
+      },
+    }),
+    keypress: s.object({
+      validate: {
+        properties: {
+          type: s.literal("keypress"),
+          key: s.string(),
+        },
+      },
+    }),
   },
 });
-
-const keypressEvent = s.object({
-  properties: {
-    type: s.literal({ validate: { identity: "keypress" } }),
-    key: s.string(),
-  },
-});
-
-const eventSchema = s.union([clickEvent, keypressEvent]);
 ```

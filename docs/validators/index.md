@@ -8,52 +8,40 @@ In `s-val`, a "validator" is a schema that defines a set of rules for a specific
 
 ### Schema Configuration
 
-You can configure a validator by passing it a configuration object. Each property in this object corresponds to a specific validation rule.
+You can configure any validator by passing it a configuration object. This object can contain up to four top-level keys:
+
+- `prepare`: An object containing functions that modify the data _before_ validation (e.g., `trim`, `coerce`).
+- `validate`: An object containing the rules that the data must pass (e.g., `minLength`, `min`).
+- `transform`: An object containing functions that modify the data _after_ successful validation (e.g., `custom`).
+- `messages`: An object containing custom error messages to override the defaults.
 
 ```typescript
-// A string that must be at least 5 characters long and a valid email.
-const emailSchema = s.string({
-  minLength: 5,
-  email: true,
+// A string that is trimmed, must be at least 5 characters long, and is transformed to a greeting.
+const greetingSchema = s.string({
+  prepare: { trim: true },
+  validate: {
+    minLength: 5,
+  },
+  transform: {
+    custom: (name) => `Hello, ${name}!`,
+  },
+  messages: {
+    minLength: "The name must be at least 5 characters long.",
+  },
 });
+
+const result = await greetingSchema.parse("  World  ");
+console.log(result); // -> "Hello, World!"
 ```
 
 ### Modifiers
 
-Two special configuration properties, `optional` and `nullable`, can be applied to any schema.
+Two special configuration properties, `optional` and `nullable`, can be applied to any schema at the top level of its configuration.
 
 - `optional: true`: Allows the value to be `undefined`. For object properties, this means the key can be missing.
 - `nullable: true`: Allows the value to be `null`.
 
 These are explained in more detail in the [main documentation](../index.md#modifiers).
-
-### Custom Error Messages
-
-Every validator accepts a `messages` property in its configuration object. This allows you to override the default error messages for any validation rule.
-
-You can customize the message for the base type check using the `identity` key.
-
-```typescript
-const nameSchema = s.string({
-  minLength: 2,
-  messages: {
-    identity: "Name must be a string.",
-    minLength: "Name must be at least 2 characters long.",
-  },
-});
-
-try {
-  await nameSchema.parse(123);
-} catch (error) {
-  // error.issues[0].message will be "Name must be a string."
-}
-
-try {
-  await nameSchema.parse("A");
-} catch (error) {
-  // error.issues[0].message will be "Name must be at least 2 characters long."
-}
-```
 
 ## Available Validators
 
@@ -79,7 +67,6 @@ Validators are grouped by category.
 ### Composition & Logic
 
 - [InstanceOf](./instanceof.md)
-- [Object Modifiers](./object-modifiers.md)
 - [Switch](./switch.md)
 - [Union](./union.md)
 

@@ -6,18 +6,16 @@ It is similar to `s.map()`, but it works with plain JavaScript objects instead o
 
 ## Usage
 
-You create a record schema by passing the key and value schemas as a tuple to the `validate.identity` property.
+You create a record schema by passing the key schema and the value schema as arguments to the `s.record()` method.
 
-1.  The first element of the tuple is the schema for the keys. This must be `s.string()` or `s.number()`.
-2.  The second element is the schema for the values. This can be any `s-val` schema.
+1.  The first argument is the schema for the keys. This must be a schema that validates to a `string` or `number`.
+2.  The second argument is the schema for the values. This can be any `s-val` schema.
 
 ```typescript
 import { s } from "s-val";
 
 // A record where keys are strings and values are numbers.
-const scoresSchema = s.record({
-  validate: { identity: [s.string(), s.number()] },
-});
+const scoresSchema = s.record(s.string(), s.number());
 
 const scores = {
   player1: 100,
@@ -34,11 +32,10 @@ The key schema is enforced for every key in the object. For example, you can req
 
 ```typescript
 // A record where keys must be valid UUIDs.
-const userRolesSchema = s.record({
-  validate: {
-    identity: [s.string({ validate: { uuid: true } }), s.string()],
-  },
-});
+const userRolesSchema = s.record(
+  s.string({ validate: { uuid: true } }),
+  s.string()
+);
 
 const validRoles = {
   "f47ac10b-58cc-4372-a567-0e02b2c3d479": "admin",
@@ -52,7 +49,11 @@ const invalidRoles = {
   "not-a-uuid": "viewer", // This key is invalid
 };
 
-await userRolesSchema.parse(invalidRoles); // ❌
+try {
+  await userRolesSchema.parse(invalidRoles); // ❌
+} catch (e) {
+  console.log(e.issues);
+}
 ```
 
 > **Note:** JavaScript object keys are implicitly converted to strings. If you use `s.number()` as the key schema, `s-val` will correctly validate the stringified number.
@@ -64,17 +65,18 @@ The value schema is enforced for every value in the object. The value schema can
 ```typescript
 // A record where values must be objects matching a specific shape.
 const userSchema = s.object({
-  properties: {
-    name: s.string(),
-    email: s.string({ validate: { email: true } }),
+  validate: {
+    properties: {
+      name: s.string(),
+      email: s.string({ validate: { email: true } }),
+    },
   },
 });
 
-const usersByIdSchema = s.record({
-  validate: {
-    identity: [s.string({ validate: { uuid: true } }), userSchema],
-  },
-});
+const usersByIdSchema = s.record(
+  s.string({ validate: { uuid: true } }),
+  userSchema
+);
 
 const validUsers = {
   "f47ac10b-58cc-4372-a567-0e02b2c3d479": {
@@ -92,5 +94,9 @@ const invalidUsers = {
   },
 };
 
-await usersByIdSchema.parse(invalidUsers); // ❌
+try {
+  await usersByIdSchema.parse(invalidUsers); // ❌
+} catch (e) {
+  console.log(e.issues);
+}
 ```

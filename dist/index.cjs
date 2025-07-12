@@ -373,34 +373,6 @@ const objectPlugin = definePlugin({
   }
 });
 
-const setPlugin = definePlugin({
-  dataType: "set",
-  validate: {
-    identity: {
-      validator: (value) => {
-        return value instanceof Set;
-      },
-      message: (ctx) => `Invalid type. Expected Set, received ${typeof ctx.value}.`
-    },
-    items: {
-      validator: async (value, [valueSchema], context) => {
-        const issues = [];
-        for (const val of value.values()) {
-          const valueResult = await valueSchema.safeParse(val, context);
-          if (valueResult.status === "error") {
-            issues.push(...valueResult.error.issues);
-          }
-        }
-        if (issues.length > 0) {
-          throw new ValidationError(issues);
-        }
-        return true;
-      },
-      message: (ctx) => `Set validation failed.`
-    }
-  }
-});
-
 /**
  * @license
  * MIT License
@@ -857,7 +829,6 @@ const plugins = [
   numberPlugin,
   objectPlugin,
   recordPlugin,
-  setPlugin,
   stringPlugin,
   unionPlugin,
   unknownPlugin
@@ -1548,6 +1519,128 @@ class ObjectSchema extends Schema {
   }
 }
 
+class SetSchema extends Schema {
+  valueSchema;
+  constructor(itemSchema, config = {}) {
+    super("set", config);
+    this.valueSchema = itemSchema;
+  }
+  async _prepare(context) {
+    const preparedValue = await super._prepare(context);
+    if (!(preparedValue instanceof Set)) {
+      return preparedValue;
+    }
+    const preparedSet = /* @__PURE__ */ new Set();
+    const preparationPromises = Array.from(preparedValue).map(
+      async (item, i) => {
+        const preparedItem = await this.valueSchema._prepare({
+          rootData: context.rootData,
+          path: [...context.path, i],
+          value: item,
+          ctx: context.ctx
+        });
+        preparedSet.add(preparedItem);
+      }
+    );
+    await Promise.all(preparationPromises);
+    return preparedSet;
+  }
+  async _validate(value, context) {
+    if (this.config.optional && value === void 0) {
+      return /* @__PURE__ */ new Set();
+    }
+    if (this.config.nullable && value === null) {
+      return null;
+    }
+    await super._validate(value, context);
+    if (!(value instanceof Set)) {
+      return;
+    }
+    const issues = [];
+    const validatedSet = /* @__PURE__ */ new Set();
+    const validationPromises = Array.from(value).map(async (item, i) => {
+      const newContext = {
+        rootData: context.rootData,
+        path: [...context.path, i],
+        value: item,
+        ctx: context.ctx
+      };
+      try {
+        const validatedItem = await this.valueSchema._validate(
+          item,
+          newContext
+        );
+        validatedSet.add(validatedItem);
+      } catch (error) {
+        if (error instanceof ValidationError) {
+          issues.push(...error.issues);
+        } else {
+          throw error;
+        }
+      }
+    });
+    await Promise.all(validationPromises);
+    if (issues.length > 0) {
+      throw new ValidationError(issues);
+    }
+    return validatedSet;
+  }
+  async _transform(value, context) {
+    const transformedValue = await super._transform(value, context);
+    if (!(transformedValue instanceof Set)) {
+      return transformedValue;
+    }
+    const newSet = /* @__PURE__ */ new Set();
+    const transformPromises = Array.from(transformedValue).map(
+      async (item, i) => {
+        const transformedItem = await this.valueSchema._transform(item, {
+          rootData: context.rootData,
+          path: [...context.path, i],
+          value: item,
+          ctx: context.ctx
+        });
+        newSet.add(transformedItem);
+      }
+    );
+    await Promise.all(transformPromises);
+    return newSet;
+  }
+}
+
+class UnionSchema extends Schema {
+  variants;
+  constructor(variants, config) {
+    super("union", config);
+    this.variants = variants;
+  }
+  async _validate(value, context) {
+    const issues = [];
+    for (const variant of this.variants) {
+      try {
+        const result = await variant.safeParse(value, context.ctx);
+        if (result.status === "success") {
+          return result.data;
+        } else {
+          issues.push(...result.error.issues);
+        }
+      } catch (error) {
+        if (error instanceof ValidationError) {
+          issues.push(...error.issues);
+        } else {
+          throw error;
+        }
+      }
+    }
+    if (issues.length > 0) {
+      throw new ValidationError(issues);
+    }
+    return await super._validate(value, context);
+  }
+  async _transform(value, context) {
+    return value;
+  }
+}
+
 function createSchemaBuilder() {
   const builder = {};
   for (const plugin of plugins) {
@@ -1590,10 +1683,9 @@ function createSchemaBuilder() {
       continue;
     }
     if (plugin.dataType === "set") {
-      builder.set = (itemSchema) => {
-        return new Schema("set", {
-          validate: { items: itemSchema }
-        });
+      builder.set = (config = {}) => {
+        const itemSchema = config?.validate?.ofType ?? new Schema("any");
+        return new SetSchema(itemSchema, config);
       };
       continue;
     }
@@ -1602,6 +1694,13 @@ function createSchemaBuilder() {
         return new Schema("instanceof", {
           validate: { constructor }
         });
+      };
+      continue;
+    }
+    if (plugin.dataType === "union") {
+      builder.union = (config = {}) => {
+        const variants = config?.validate?.variants ?? [];
+        return new UnionSchema(variants, config);
       };
       continue;
     }

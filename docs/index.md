@@ -78,6 +78,33 @@ if (result.status === "error") {
 }
 ```
 
+### Dynamic Messages with Functions
+
+For more advanced use cases, you can provide a function to the `messages` object. This function will receive a context object containing the `value` being validated, the `label` for the schema, the validation `args`, and more. This allows you to create dynamic error messages.
+
+```typescript
+import { s } from "s-val";
+
+const ageSchema = s.number({
+  label: "User age",
+  validate: {
+    min: 18,
+  },
+  messages: {
+    min: (ctx) =>
+      `Error for ${ctx.label}: the value ${ctx.value} is too low. ` +
+      `Minimum is ${ctx.args[0]}.`,
+  },
+});
+
+const result = await ageSchema.safeParse(16);
+
+if (result.status === "error") {
+  console.log(result.error.issues[0].message);
+  // Output: "Error for User age: the value 16 is too low. Minimum is 18."
+}
+```
+
 ## Modifiers
 
 You can modify any schema to allow for `undefined` or `null` values using the `optional` and `nullable` configuration properties.
@@ -88,9 +115,11 @@ To allow a value to be `undefined`, set `optional: true` in its schema definitio
 
 ```typescript
 const schema = s.object({
-  properties: {
-    name: s.string(),
-    bio: s.string({ optional: true }),
+  validate: {
+    properties: {
+      name: s.string(),
+      bio: s.string({ optional: true }),
+    },
   },
 });
 
@@ -105,9 +134,11 @@ To allow a value to be `null`, set `nullable: true` in its schema definition.
 
 ```typescript
 const schema = s.object({
-  properties: {
-    name: s.string(),
-    bio: s.string({ nullable: true }),
+  validate: {
+    properties: {
+      name: s.string(),
+      bio: s.string({ nullable: true }),
+    },
   },
 });
 
@@ -137,12 +168,14 @@ To infer the type, use the `s.infer<T>` utility, where `T` is the `typeof` your 
 import { s } from "s-val";
 
 const userSchema = s.object({
-  properties: {
-    name: s.string(),
-    age: s.number(),
-    isAdmin: s.boolean({ optional: true }),
-    // Correct syntax for an array of strings
-    tags: s.array(s.string(), { nullable: true }),
+  validate: {
+    properties: {
+      name: s.string(),
+      age: s.number(),
+      isAdmin: s.boolean({ optional: true }),
+      // Correct syntax for an array of strings
+      tags: s.array(s.string(), { nullable: true }),
+    },
   },
 });
 
@@ -192,7 +225,9 @@ import { s } from "s-val";
 import type { StandardSchemaV1 } from "s-val";
 
 const userSchema = s.object({
-  properties: { name: s.string() },
+  validate: {
+    properties: { name: s.string() },
+  },
 });
 
 // Access the standard interface

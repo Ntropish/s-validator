@@ -4,14 +4,12 @@ The `map` validator checks if a value is a `Map` and validates its keys and valu
 
 ## Usage
 
-You pass the key and value schemas as a tuple to the `validate.identity` property.
+You pass the key schema and value schema as arguments to the `s.map()` method.
 
 ```typescript
 import { s } from "s-val";
 
-const schema = s.map({
-  validate: { identity: [s.string(), s.number()] },
-});
+const schema = s.map(s.string(), s.number());
 
 const map = new Map([
   ["a", 1],
@@ -24,5 +22,9 @@ const invalidMap = new Map([
   ["a", "1"], // Value should be a number
 ]);
 
-await schema.parse(invalidMap); // ❌
+try {
+  await schema.parse(invalidMap); // ❌
+} catch (e) {
+  console.log(e.issues);
+}
 ```

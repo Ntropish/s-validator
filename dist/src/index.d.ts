@@ -4,6 +4,8 @@ import { InferSchemaType, SObjectProperties, InferSObjectType, ValidatorConfig, 
 import { Schema } from './schemas/schema.js';
 import { ArraySchema } from './schemas/array.js';
 import { ObjectSchema } from './schemas/object.js';
+import { SetSchema } from './schemas/set.js';
+import { UnionSchema } from './schemas/union.js';
 export { SwitchSchema };
 type Builder = {
     [P in Exclude<(typeof plugins)[number], {
@@ -21,7 +23,16 @@ type Builder = {
     literal(value: string | number | boolean | null | undefined): Schema<any>;
     record(keySchema: Schema<any, any>, valueSchema: Schema<any, any>): Schema<Record<any, any>>;
     map(keySchema: Schema<any, any>, valueSchema: Schema<any, any>): Schema<Map<any, any>>;
-    set(itemSchema: Schema<any, any>): Schema<Set<any>>;
+    set<T extends Schema<any, any>>(config?: ValidatorConfig<any> & {
+        validate?: {
+            ofType?: T;
+        };
+    }): SetSchema<T, Set<InferSchemaType<T>>>;
+    union<T extends readonly [Schema<any, any>, ...Schema<any, any>[]]>(config?: ValidatorConfig<any> & {
+        validate?: {
+            variants?: T;
+        };
+    }): UnionSchema<T, InferSchemaType<T[number]>>;
     instanceof(constructor: new (...args: any[]) => any): Schema<any>;
 };
 export declare const s: Builder;

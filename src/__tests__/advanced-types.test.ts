@@ -30,13 +30,17 @@ describe("Advanced Type Validators", () => {
 
   describe("set", () => {
     it("should validate a correct set", async () => {
-      const schema = s.set(s.number());
+      const schema = s.set({
+        validate: { ofType: s.number() },
+      });
       const set = new Set([1, 2, 3]);
       await expect(schema.parse(set)).resolves.toEqual(set);
     });
 
     it("should throw for an invalid value in a set", async () => {
-      const schema = s.set(s.number());
+      const schema = s.set({
+        validate: { ofType: s.number() },
+      });
       const set = new Set([1, "2", 3]);
       await expect((schema as any).parse(set)).rejects.toThrow(ValidationError);
     });
