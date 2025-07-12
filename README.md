@@ -8,9 +8,9 @@
 
 - **Zero Dependencies:** Lightweight and easy to integrate.
 - **Type-Safe:** Full TypeScript support for excellent autocompletion and error checking.
-- **Declarative API:** Build complex schemas with simple, chainable validators.
+- **Declarative API:** Build complex schemas with a simple and clear configuration-object API.
 - **Async First:** All validation is asynchronous, supporting custom async validators out of the box.
-- **Extensible:** Easily add your own custom validators.
+- **Extensible:** A powerful plugin system allows for easy custom extensions.
 
 ## Getting Started
 
@@ -32,9 +32,12 @@ import { s } from "s-val";
 // 1. Define a schema
 const userSchema = s.object({
   properties: {
-    name: s.string({ minLength: 3 }),
-    email: s.string({ email: true }),
-    age: s.number({ min: 18, optional: true }),
+    name: s.string({ validate: { minLength: 3 } }),
+    email: s.string({ validate: { email: true } }),
+    age: s.number({
+      validate: { min: 18 },
+      optional: true,
+    }),
   },
 });
 
