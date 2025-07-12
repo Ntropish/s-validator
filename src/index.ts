@@ -1,3 +1,4 @@
+// This is a test to confirm the editing process is working.
 import {
   validatorMap,
   preparationMap,
@@ -101,16 +102,6 @@ type SObjectOptions<P extends SObjectProperties> = ValidatorConfig<any> & {
   strict?: boolean;
 };
 
-function isValidationContext(thing: any): thing is ValidationContext {
-  return (
-    typeof thing === "object" &&
-    thing !== null &&
-    "rootData" in thing &&
-    "path" in thing &&
-    "value" in thing
-  );
-}
-
 export class Schema<TOutput, TInput = TOutput>
   implements StandardSchemaV1<TInput, TOutput>
 {
@@ -144,11 +135,19 @@ export class Schema<TOutput, TInput = TOutput>
     transformationMap: Record<string, any>
   ) {
     this.dataType = dataType;
-    this.config = config;
+    this.config = config; // Keep original config for modifiers
+
+    const {
+      prepare,
+      validate,
+      transform,
+      // messages, optional, and nullable are read from this.config
+      ...rest
+    } = config as ValidatorConfig<any> & Record<string, any>;
+
     const validatorCollection = validatorMap[dataType];
     const preparationCollection = preparationMap[dataType];
     const transformationCollection = transformationMap[dataType];
-    const { prepare, validate, transform } = config as ValidatorConfig<any>;
 
     if (validatorCollection?.identity) {
       this.validators.push({
@@ -161,7 +160,7 @@ export class Schema<TOutput, TInput = TOutput>
     if (prepare) {
       for (const [prepName, prepConfig] of Object.entries(prepare)) {
         if (prepName === "custom") {
-          this.customPreparations = prepConfig;
+          this.customPreparations = prepConfig as any[];
           continue;
         }
         if (preparationCollection?.[prepName]) {
@@ -174,12 +173,17 @@ export class Schema<TOutput, TInput = TOutput>
       }
     }
 
-    if (validate) {
-      for (let [valName, valConfig] of Object.entries(validate)) {
+    const validationRules = { ...(validate || {}), ...rest };
+    if (validationRules) {
+      for (let [valName, valConfig] of Object.entries(validationRules)) {
         if (valName === "custom") {
-          this.customValidators = Array.isArray(valConfig)
-            ? valConfig
-            : [valConfig];
+          this.customValidators = this.customValidators.concat(
+            Array.isArray(valConfig) ? valConfig : [valConfig]
+          );
+          continue;
+        }
+        // a value of `false` for a validator should be ignored
+        if (valConfig === false) {
           continue;
         }
         if (valConfig === undefined) {
@@ -198,7 +202,7 @@ export class Schema<TOutput, TInput = TOutput>
     if (transform) {
       for (const [transName, transConfig] of Object.entries(transform)) {
         if (transName === "custom") {
-          this.customTransformations = transConfig;
+          this.customTransformations = transConfig as any[];
           continue;
         }
         if (transformationCollection?.[transName]) {
@@ -340,18 +344,12 @@ export class Schema<TOutput, TInput = TOutput>
     return current_value;
   }
 
-  public async parse(data: TInput): Promise<TOutput>;
-  public async parse(context: ValidationContext): Promise<TOutput>;
-  public async parse(
-    dataOrContext: TInput | ValidationContext
-  ): Promise<TOutput> {
-    const context: ValidationContext = isValidationContext(dataOrContext)
-      ? dataOrContext
-      : {
-          rootData: dataOrContext,
-          path: [],
-          value: dataOrContext,
-        };
+  public async parse(data: TInput): Promise<TOutput> {
+    const context: ValidationContext = {
+      rootData: data,
+      path: [],
+      value: data,
+    };
 
     const preparedValue = await this._prepare(context);
     await this._validate(preparedValue, { ...context, value: preparedValue });
@@ -362,23 +360,10 @@ export class Schema<TOutput, TInput = TOutput>
     return transformedValue;
   }
 
-  public async safeParse(data: TInput): Promise<SafeParseResult<TOutput>>;
-  public async safeParse(
-    context: ValidationContext
-  ): Promise<SafeParseResult<TOutput>>;
-  public async safeParse(
-    dataOrContext: TInput | ValidationContext
-  ): Promise<SafeParseResult<TOutput>> {
-    const context: ValidationContext = isValidationContext(dataOrContext)
-      ? dataOrContext
-      : {
-          rootData: dataOrContext,
-          path: [],
-          value: dataOrContext,
-        };
+  public async safeParse(data: TInput): Promise<SafeParseResult<TOutput>> {
     try {
-      const data = await this.parse(context);
-      return { status: "success", data };
+      const parsedData = await this.parse(data);
+      return { status: "success", data: parsedData };
     } catch (e) {
       if (e instanceof ValidationError) {
         return { status: "error", error: e };
@@ -469,7 +454,8 @@ class ObjectSchema<
 
       if (schema) {
         try {
-          await schema._validate(propertyValue, childContext);
+          const result = await schema._validate(propertyValue, childContext);
+          console.log("result", result);
         } catch (e) {
           if (e instanceof ValidationError) issues.push(...e.issues);
           else throw e;
@@ -605,6 +591,14 @@ class ObjectSchema<
       properties: this.config.properties as P,
     };
     return new ObjectSchema(newConfig);
+  }
+
+  public optional(): Schema<T | undefined, T | undefined> {
+    return new ObjectSchema({ ...(this.config as any), optional: true });
+  }
+
+  public nullable(): Schema<T | null, T | null> {
+    return new ObjectSchema({ ...(this.config as any), nullable: true });
   }
 }
 
@@ -790,6 +784,14 @@ class ArraySchema<T extends Schema<any, any>> extends Schema<
       value: transformedArray,
     });
   }
+
+  public optional(): Schema<Array<s.infer<T>> | undefined> {
+    return new ArraySchema({ ...(this.config as any), optional: true }) as any;
+  }
+
+  public nullable(): Schema<Array<s.infer<T>> | null> {
+    return new ArraySchema({ ...(this.config as any), nullable: true }) as any;
+  }
 }
 
 class RecordSchema<
@@ -891,18 +893,13 @@ class RecordSchema<
 
     const finalRecord: Record<string | number, s.infer<V>> = {};
     for (const [key, val] of Object.entries(value as object)) {
-      const keyContext = {
-        ...context,
-        value: key,
-        path: [...context.path, key],
-      };
       const valueContext = {
         ...context,
         value: val,
         path: [...context.path, key],
       };
 
-      const transformedKey = await this.keySchema.parse(keyContext);
+      const transformedKey = await this.keySchema.parse(key);
       const transformedValue = await this.valueSchema._transform(
         val,
         valueContext
@@ -913,6 +910,26 @@ class RecordSchema<
     return super._transform(finalRecord, {
       ...context,
       value: finalRecord,
+    }) as any;
+  }
+
+  public optional(): Schema<
+    Record<s.infer<K>, s.infer<V>> | undefined,
+    Record<s.infer<K>, s.infer<V>> | undefined
+  > {
+    return new RecordSchema(this.keySchema, this.valueSchema, {
+      ...(this.config as any),
+      optional: true,
+    }) as any;
+  }
+
+  public nullable(): Schema<
+    Record<s.infer<K>, s.infer<V>> | null,
+    Record<s.infer<K>, s.infer<V>> | null
+  > {
+    return new RecordSchema(this.keySchema, this.valueSchema, {
+      ...(this.config as any),
+      nullable: true,
     }) as any;
   }
 }
@@ -1095,18 +1112,13 @@ class MapSchema<
 
     const newMap = new Map();
     for (const [key, val] of value.entries()) {
-      const keyContext = {
-        ...context,
-        value: key,
-        path: [...context.path, key, "key"],
-      };
       const valueContext = {
         ...context,
         value: val,
         path: [...context.path, key, "value"],
       };
 
-      const transformedKey = await this.keySchema.parse(keyContext);
+      const transformedKey = await this.keySchema.parse(key);
       const transformedValue = await this.valueSchema._transform(
         val,
         valueContext
@@ -1115,6 +1127,19 @@ class MapSchema<
     }
 
     return super._transform(newMap, { ...context, value: newMap }) as any;
+  }
+
+  public optional(): Schema<
+    Map<InferSchemaType<K>, InferSchemaType<V>> | undefined
+  > {
+    return new MapSchema(this.keySchema, this.valueSchema) as any;
+  }
+
+  public nullable(): Schema<Map<
+    InferSchemaType<K>,
+    InferSchemaType<V>
+  > | null> {
+    return new MapSchema(this.keySchema, this.valueSchema) as any;
   }
 }
 
@@ -1209,6 +1234,14 @@ class SetSchema<V extends Schema<any, any>> extends Schema<
 
     return super._transform(newSet, { ...context, value: newSet }) as any;
   }
+
+  public optional(): Schema<Set<InferSchemaType<V>> | undefined> {
+    return new SetSchema(this.valueSchema) as any;
+  }
+
+  public nullable(): Schema<Set<InferSchemaType<V>> | null> {
+    return new SetSchema(this.valueSchema) as any;
+  }
 }
 
 class InstanceOfSchema<T extends new (...args: any) => any> extends Schema<
@@ -1242,6 +1275,14 @@ class InstanceOfSchema<T extends new (...args: any) => any> extends Schema<
         },
       ]);
     }
+  }
+
+  public optional(): Schema<InstanceType<T> | undefined> {
+    return new InstanceOfSchema(this.constructorFn) as any;
+  }
+
+  public nullable(): Schema<InstanceType<T> | null> {
+    return new InstanceOfSchema(this.constructorFn) as any;
   }
 }
 
@@ -1282,6 +1323,14 @@ class LiteralSchema<
       ]);
     }
   }
+
+  public optional(): Schema<T | undefined> {
+    return new LiteralSchema(this.literal) as any;
+  }
+
+  public nullable(): Schema<T | null> {
+    return new LiteralSchema(this.literal) as any;
+  }
 }
 
 class UnionSchema<
@@ -1300,30 +1349,61 @@ class UnionSchema<
     this.schemas = schemas;
   }
 
-  public async parse(
-    dataOrContext: any | ValidationContext
-  ): Promise<InferSchemaType<T[number]>> {
-    const context: ValidationContext = isValidationContext(dataOrContext)
-      ? dataOrContext
-      : {
-          rootData: dataOrContext,
-          path: [],
-          value: dataOrContext,
-        };
-
+  public async _validate(
+    value: any,
+    context: ValidationContext
+  ): Promise<void> {
     const issues: ValidationIssue[] = [];
     for (const schema of this.schemas) {
       try {
-        return await schema.parse(context);
+        await schema._validate(value, context);
+        // If one schema validates successfully, the union is valid.
+        return;
       } catch (e) {
         if (e instanceof ValidationError) {
           issues.push(...e.issues);
         } else {
+          // Re-throw unexpected errors
           throw e;
         }
       }
     }
+    // If no schema validated, throw a collected error.
     throw new ValidationError(issues);
+  }
+
+  public async _transform(
+    value: any,
+    context: ValidationContext
+  ): Promise<any> {
+    for (const schema of this.schemas) {
+      try {
+        // We need to re-run validate to know which schema to use for transform
+        await schema._validate(value, context);
+        return schema._transform(value, context);
+      } catch (e) {
+        // Ignore validation errors and try the next schema
+        if (!(e instanceof ValidationError)) {
+          throw e;
+        }
+      }
+    }
+    // This should be unreachable if validation passed
+    return value;
+  }
+
+  public optional(): Schema<InferSchemaType<T[number]> | undefined> {
+    const newConfig = { ...this.config, optional: true };
+    const newUnion = new UnionSchema(this.schemas);
+    newUnion.config.optional = true;
+    return newUnion as any;
+  }
+
+  public nullable(): Schema<InferSchemaType<T[number]> | null> {
+    const newConfig = { ...this.config, nullable: true };
+    const newUnion = new UnionSchema(this.schemas);
+    newUnion.config.nullable = true;
+    return newUnion as any;
   }
 }
 

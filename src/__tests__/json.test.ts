@@ -93,7 +93,9 @@ describe("json validator", () => {
         },
       },
     });
-    await expect(schema.parse(validData)).resolves.toBe(validData);
+    const result = await schema.parse(validData);
+    console.log("result", result);
+    await expect(result).resolves.toBe(validData);
 
     const invalidData = JSON.stringify({
       user: {

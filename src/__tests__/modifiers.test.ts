@@ -29,7 +29,7 @@ describe("Modifiers", () => {
       await expect(schema.parse(invalidData)).rejects.toThrow();
     });
 
-    it.only("should fail if a required property is missing", async () => {
+    it("should fail if a required property is missing", async () => {
       const schema = s.object({
         properties: {
           required: s.string(),
