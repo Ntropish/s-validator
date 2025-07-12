@@ -136,5 +136,16 @@ You can create complex data structures by nesting schemas.
 
 Now that you have the basics, you can dive deeper into the specific validators or learn how to create your own.
 
-- **[Validator Reference](./validators/):** Detailed API for all built-in validators.
+- **[Validator Reference](./validators/index.md):** Detailed API for all built-in validators.
+
+  - [Any](./validators/any.md)
+  - [Array](./validators/array.md)
+  - [Boolean](./validators/boolean.md)
+  - [Date](./validators/date.md)
+  - [Number](./validators/number.md)
+  - [Object](./validators/object.md)
+  - [String](./validators/string.md)
+  - [Union](./validators/union.md)
+  - [Switch](./validators/switch.md)
+
 - **[Extensibility](./extensibility.md):** Learn how to create custom validators.
