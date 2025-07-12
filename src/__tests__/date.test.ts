@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { s } from "../index.js";
-import { ValidationError } from "../validators/types.js";
+import { ValidationError } from "../types.js";
 
 describe("Date Validator", () => {
   it("should validate a Date object", async () => {

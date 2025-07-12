@@ -1,5 +1,5 @@
-import { definePlugin, ValidationError, ValidationContext } from "./types.js";
-import type { Schema } from "../index.js";
+import { definePlugin, ValidationError, ValidationContext } from "../types.js";
+import { Schema } from "../schemas/schema.js";
 
 export const arrayPlugin = definePlugin<any[]>({
   dataType: "array",

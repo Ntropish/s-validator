@@ -1,4 +1,4 @@
-import { definePlugin } from "./types.js";
+import { definePlugin } from "../types.js";
 
 export const nanPlugin = definePlugin<number>({
   dataType: "nan",

@@ -1,10 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { s } from "../index.js";
-import {
-  ValidationContext,
-  Schema,
-  ValidationError,
-} from "../validators/types.js";
+import { ValidationContext, ValidationError } from "../types.js";
+import { Schema } from "../schemas/schema.js";
 
 describe("Switch Validator", () => {
   describe("Practical Scenarios", () => {

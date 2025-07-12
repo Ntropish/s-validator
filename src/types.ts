@@ -1,4 +1,5 @@
-import { Schema } from "../index.js";
+import { type Schema } from "./schemas/schema.js";
+import { SwitchConfig } from "./schemas/switch.js";
 
 // A stripped-down interface that recursive validators use to call `parse`.
 export interface SchemaLike {
@@ -133,4 +134,63 @@ export type SafeParseError = {
 
 export type SafeParseResult<T> = SafeParseSuccess<T> | SafeParseError;
 
-export { Schema };
+// A utility to force TS to expand a type in tooltips for better DX.
+export type Prettify<T> = { [K in keyof T]: T[K] } & {};
+
+// The keys of T that can be undefined
+export type UndefinedKeys<T> = {
+  [K in keyof T]: undefined extends T[K] ? K : never;
+}[keyof T];
+
+// Make properties of T optional if their value can be undefined
+export type UndefinedToOptional<T> = Prettify<
+  { [K in Exclude<keyof T, UndefinedKeys<T>>]: T[K] } & {
+    [K in UndefinedKeys<T>]?: T[K];
+  }
+>;
+
+export type CustomValidator<T> =
+  | ((value: T, context: ValidationContext) => boolean | Promise<boolean>)
+  | {
+      validator: (
+        value: T,
+        context: ValidationContext
+      ) => boolean | Promise<boolean>;
+      message?: string;
+    };
+
+// Creates a typed config object from a validator collection.
+export type ValidatorConfig<VCollection> = {
+  optional?: boolean;
+  nullable?: boolean;
+  label?: string;
+  messages?: Prettify<
+    {
+      [K in keyof Omit<
+        VCollection,
+        "identity" | "messages" | "preparations" | "transformations"
+      >]?: string;
+    } & {
+      identity?: string;
+    }
+  >;
+  prepare?: Record<string, any> & { custom?: ((value: any) => any)[] };
+  validate?: Record<string, any> & {
+    custom?: CustomValidator<any> | CustomValidator<any>[];
+  };
+  transform?: Record<string, any> & { custom?: ((value: any) => any)[] };
+};
+
+export type InferSchemaType<T extends Schema<any, any>> = T extends Schema<
+  infer U,
+  any
+>
+  ? U
+  : never;
+
+export type SObjectProperties = Record<string, Schema<any, any>>;
+export type InferSObjectType<P extends SObjectProperties> = Prettify<
+  UndefinedToOptional<{
+    [K in keyof P]: InferSchemaType<P[K]>;
+  }>
+>;

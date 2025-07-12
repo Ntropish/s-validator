@@ -60,11 +60,45 @@ const arrayPlugin = definePlugin({
       validator: (value) => new Set(value).size === value.length,
       message: (ctx) => `${ctx.label} must contain unique items.`
     },
+    ofType: {
+      async validator(value, [schema], context) {
+        for (let i = 0; i < value.length; i++) {
+          const result = await schema.safeParse(value[i], context.ctx);
+          if (result.status === "error") {
+            const issues = result.error.issues.map((issue) => ({
+              ...issue,
+              path: [...context.path, i, ...issue.path]
+            }));
+            throw new ValidationError(issues);
+          }
+        }
+        return true;
+      },
+      message: () => `Invalid item in array.`
+    },
     items: {
-      validator: () => true,
-      // Placeholder
-      message: (ctx) => `Invalid item in ${ctx.label}.`
-      // Placeholder
+      async validator(value, schemas, context) {
+        if (value.length !== schemas.length) {
+          throw new ValidationError([
+            {
+              message: `Expected ${schemas.length} items, but received ${value.length}.`,
+              path: context.path
+            }
+          ]);
+        }
+        for (let i = 0; i < schemas.length; i++) {
+          const result = await schemas[i].safeParse(value[i], context.ctx);
+          if (result.status === "error") {
+            const issues = result.error.issues.map((issue) => ({
+              ...issue,
+              path: [...context.path, i, ...issue.path]
+            }));
+            throw new ValidationError(issues);
+          }
+        }
+        return true;
+      },
+      message: () => `Invalid tuple item.`
     }
   }
 });
@@ -176,8 +210,13 @@ const instanceofPlugin = definePlugin({
   dataType: "instanceof",
   validate: {
     identity: {
+      validator: (value) => {
+        return typeof value === "object" && value !== null;
+      },
+      message: (ctx) => `Invalid type. Expected object, received ${typeof ctx.value}.`
+    },
+    constructor: {
       validator: (value, [constructor]) => {
-        if (!constructor) return false;
         return value instanceof constructor;
       },
       message: (ctx) => {
@@ -192,28 +231,30 @@ const mapPlugin = definePlugin({
   dataType: "map",
   validate: {
     identity: {
+      validator: (value) => {
+        return value instanceof Map;
+      },
+      message: (ctx) => `Invalid type. Expected Map, received ${typeof ctx.value}.`
+    },
+    entries: {
       validator: async (value, [keySchema, valueSchema], context) => {
-        if (!(value instanceof Map)) return false;
-        if (!keySchema || !valueSchema) return false;
         const issues = [];
         for (const [key, val] of value.entries()) {
-          try {
-            await keySchema.parse(key, context);
-            await valueSchema.parse(val, context);
-          } catch (e) {
-            if (e instanceof ValidationError) {
-              issues.push(e);
-            } else {
-              throw e;
-            }
+          const keyResult = await keySchema.safeParse(key, context);
+          if (keyResult.status === "error") {
+            issues.push(...keyResult.error.issues);
+          }
+          const valueResult = await valueSchema.safeParse(val, context);
+          if (valueResult.status === "error") {
+            issues.push(...valueResult.error.issues);
           }
         }
         if (issues.length > 0) {
-          throw new ValidationError(issues.flatMap((e) => e.issues));
+          throw new ValidationError(issues);
         }
         return true;
       },
-      message: (ctx) => `Invalid type. Expected Map, received ${typeof ctx.value}.`
+      message: (ctx) => `Map validation failed.`
     }
   }
 });
@@ -328,65 +369,6 @@ const objectPlugin = definePlugin({
         return typeof value === "object" && value !== null && !Array.isArray(value);
       },
       message: (ctx) => `Invalid type. Expected object, received ${typeof ctx.value}.`
-    },
-    properties: {
-      validator: async (value, [shape], context, schema) => {
-        const issues = [];
-        const { strict } = schema.config;
-        const allKeys = /* @__PURE__ */ new Set([...Object.keys(value), ...Object.keys(shape)]);
-        for (const key of allKeys) {
-          const propertySchema = shape[key];
-          const propertyValue = value[key];
-          const propertyContext = {
-            ...context,
-            path: [...context.path, key]
-          };
-          if (propertySchema) {
-            try {
-              await propertySchema._validate(propertyValue, propertyContext);
-            } catch (e) {
-              if (e instanceof ValidationError) {
-                issues.push(...e.issues);
-              } else {
-                throw e;
-              }
-            }
-          } else if (strict && Object.prototype.hasOwnProperty.call(value, key)) {
-            issues.push({
-              path: propertyContext.path,
-              message: `Unrecognized key: '${key}'`
-            });
-          }
-        }
-        if (issues.length > 0) {
-          throw new ValidationError(issues);
-        }
-        return true;
-      },
-      message: () => `Object properties are invalid.`
-    }
-  },
-  transform: {
-    properties: async (value, [shape], context) => {
-      const transformedObject = { ...value };
-      for (const key in shape) {
-        if (Object.prototype.hasOwnProperty.call(value, key)) {
-          const propertySchema = shape[key];
-          const propertyValue = value[key];
-          const propertyContext = { ...context, path: [...context.path, key] };
-          transformedObject[key] = await propertySchema._transform(
-            propertyValue,
-            propertyContext
-          );
-        }
-      }
-      const finalObject = {};
-      for (const key of Object.keys(shape)) {
-        if (Object.prototype.hasOwnProperty.call(transformedObject, key)) {
-          finalObject[key] = transformedObject[key];
-        }
-      }
-      return finalObject;
     }
   }
 });
@@ -395,27 +377,26 @@ const setPlugin = definePlugin({
   dataType: "set",
   validate: {
     identity: {
+      validator: (value) => {
+        return value instanceof Set;
+      },
+      message: (ctx) => `Invalid type. Expected Set, received ${typeof ctx.value}.`
+    },
+    items: {
       validator: async (value, [valueSchema], context) => {
-        if (!(value instanceof Set)) return false;
-        if (!valueSchema) return false;
         const issues = [];
         for (const val of value.values()) {
-          try {
-            await valueSchema.parse(val, context);
-          } catch (e) {
-            if (e instanceof ValidationError) {
-              issues.push(e);
-            } else {
-              throw e;
-            }
+          const valueResult = await valueSchema.safeParse(val, context);
+          if (valueResult.status === "error") {
+            issues.push(...valueResult.error.issues);
           }
         }
         if (issues.length > 0) {
-          throw new ValidationError(issues.flatMap((e) => e.issues));
+          throw new ValidationError(issues);
         }
         return true;
       },
-      message: (ctx) => `Invalid type. Expected Set, received ${typeof ctx.value}.`
+      message: (ctx) => `Set validation failed.`
     }
   }
 });
@@ -568,20 +549,20 @@ const stringPlugin = definePlugin({
       message: (ctx) => `${ctx.label} must be at most ${ctx.args[0]} characters long.`
     },
     range: {
-      validator: (value, [[min, max]]) => value.length >= min && value.length <= max,
-      message: (ctx) => `${ctx.label} must be between ${ctx.args[0][0]} and ${ctx.args[0][1]} characters long.`
+      validator: (value, [min, max]) => value.length >= min && value.length <= max,
+      message: (ctx) => `${ctx.label} must be between ${ctx.args[0]} and ${ctx.args[1]} characters long.`
     },
     exclusiveRange: {
-      validator: (value, [[min, max]]) => value.length > min && value.length < max,
-      message: (ctx) => `${ctx.label} must be strictly between ${ctx.args[0][0]} and ${ctx.args[0][1]} characters long.`
+      validator: (value, [min, max]) => value.length > min && value.length < max,
+      message: (ctx) => `${ctx.label} must be strictly between ${ctx.args[0]} and ${ctx.args[1]} characters long.`
     },
     pattern: {
       validator: (value, [pattern]) => pattern.test(value),
       message: (ctx) => `${ctx.label} does not match the required pattern.`
     },
     oneOf: {
-      validator: (value, [options]) => options.includes(value),
-      message: (ctx) => `${ctx.label} must be one of the following values: ${ctx.args[0].join(
+      validator: (value, options) => options.includes(value),
+      message: (ctx) => `${ctx.label} must be one of the following values: ${ctx.args.join(
         ", "
       )}`
     },
@@ -738,13 +719,13 @@ const stringPlugin = definePlugin({
     },
     email: {
       validator: (value, [config]) => {
-        if (config === void 0) {
+        if (config === void 0 || config === false) {
           return true;
         }
+        if (!regex.email.test(value)) {
+          return false;
+        }
         if (typeof config === "object") {
-          if (!regex.email.test(value)) {
-            return false;
-          }
           const domain = value.substring(value.lastIndexOf("@") + 1);
           if (config.denied) {
             for (const rule of config.denied) {
@@ -761,9 +742,8 @@ const stringPlugin = definePlugin({
             }
             return false;
           }
-          return true;
         }
-        return config ? regex.email.test(value) : !regex.email.test(value);
+        return true;
       },
       message: (ctx) => `${ctx.label} must be a valid email address.`
     }
@@ -780,10 +760,18 @@ const unknownPlugin = definePlugin({
   }
 });
 
+const isLiteral = (value) => {
+  const type = typeof value;
+  return type === "string" || type === "number" || type === "boolean" || value === null;
+};
 const literalPlugin = definePlugin({
   dataType: "literal",
   validate: {
     identity: {
+      validator: isLiteral,
+      message: (ctx) => `Invalid type. Expected a literal value.`
+    },
+    equals: {
       validator: (value, [literal]) => {
         return value === literal;
       },
@@ -798,8 +786,11 @@ const unionPlugin = definePlugin({
   dataType: "union",
   validate: {
     identity: {
-      validator: async (value, [schemas], context) => {
-        if (!schemas) return false;
+      validator: () => true,
+      message: () => "is any"
+    },
+    variants: {
+      validator: async (value, schemas, context) => {
         const issues = [];
         for (const schema of schemas) {
           try {
@@ -824,58 +815,30 @@ const recordPlugin = definePlugin({
   dataType: "record",
   validate: {
     identity: {
+      validator: (value) => {
+        return typeof value === "object" && value !== null && !Array.isArray(value);
+      },
+      message: (ctx) => `Invalid type. Expected a record object, received ${typeof ctx.value}.`
+    },
+    keysAndValues: {
       validator: async (value, [keySchema, valueSchema], context) => {
-        if (typeof value !== "object" || value === null || Array.isArray(value)) {
-          return false;
-        }
-        if (!keySchema || !valueSchema) return false;
         const issues = [];
         for (const [key, val] of Object.entries(value)) {
-          try {
-            await keySchema.parse(key, context);
-            await valueSchema.parse(val, context);
-          } catch (e) {
-            if (e instanceof ValidationError) {
-              issues.push(e);
-            } else {
-              throw e;
-            }
+          const keyResult = await keySchema.safeParse(key, context);
+          if (keyResult.status === "error") {
+            issues.push(...keyResult.error.issues);
+          }
+          const valueResult = await valueSchema.safeParse(val, context);
+          if (valueResult.status === "error") {
+            issues.push(...valueResult.error.issues);
           }
         }
         if (issues.length > 0) {
-          throw new ValidationError(issues.flatMap((e) => e.issues));
+          throw new ValidationError(issues);
         }
         return true;
       },
-      message: (ctx) => `Invalid type. Expected a record object, received ${typeof ctx.value}.`
-    }
-  }
-});
-
-const switchPlugin = definePlugin({
-  dataType: "switch",
-  validate: {
-    identity: {
-      validator: async (value, args, context, schema) => {
-        const {
-          select,
-          cases,
-          default: defaultSchema
-        } = schema.config;
-        if (!select || !cases) {
-          return true;
-        }
-        const key = select(context);
-        const caseSchema = cases[key] || defaultSchema;
-        if (caseSchema) {
-          const result = await caseSchema.safeParse(value, context);
-          if (result.status === "error") {
-            throw result.error;
-          }
-        }
-        return true;
-      },
-      message: (ctx) => `Switch validation failed.`
+      message: (ctx) => `Record validation failed.`
     }
   }
 });
@@ -896,7 +859,6 @@ const plugins = [
   recordPlugin,
   setPlugin,
   stringPlugin,
-  switchPlugin,
   unionPlugin,
   unknownPlugin
 ];
@@ -997,7 +959,7 @@ class Schema {
           this.validators.push({
             name: valName,
             validator: validatorCollection[valName],
-            args: [valConfig]
+            args: Array.isArray(valConfig) ? valConfig : [valConfig]
           });
         }
       }
@@ -1061,7 +1023,7 @@ class Schema {
     const messages = this.config.messages ?? {};
     const current_value = value;
     if (this.config.optional && current_value === void 0) return;
-    if (this.config.nullable && current_value === null) return;
+    if (this.config.nullable && current_value === null) return current_value;
     const identityValidator = this.validators.find(
       (v) => v.name === "identity"
     );
@@ -1178,6 +1140,7 @@ class Schema {
     if (issues.length > 0) {
       throw new ValidationError(issues);
     }
+    return current_value;
   }
   async _transform(value, context) {
     let current_value = value;
@@ -1200,29 +1163,43 @@ class Schema {
     return current_value;
   }
   async parse(data, ctx) {
+    const result = await this.safeParse(data, ctx);
+    if (result.status === "error") {
+      throw result.error;
+    }
+    return result.data;
+  }
+  async safeParse(data, ctx) {
     const context = {
       rootData: data,
       path: [],
       value: data,
       ctx
     };
-    const preparedValue = await this._prepare(context);
-    await this._validate(preparedValue, { ...context, value: preparedValue });
-    const transformedValue = await this._transform(preparedValue, {
-      ...context,
-      value: preparedValue
-    });
-    return transformedValue;
-  }
-  async safeParse(data, ctx) {
     try {
-      const parsedData = await this.parse(data, ctx);
-      return { status: "success", data: parsedData };
-    } catch (e) {
-      if (e instanceof ValidationError) {
-        return { status: "error", error: e };
+      const preparedValue = await this._prepare(context);
+      const validatedValue = await this._validate(preparedValue, {
+        ...context,
+        value: preparedValue
+      });
+      const transformedValue = await this._transform(validatedValue, {
+        ...context,
+        value: validatedValue
+      });
+      return { status: "success", data: transformedValue };
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        return { status: "error", error };
       }
-      throw e;
+      return {
+        status: "error",
+        error: new ValidationError([
+          {
+            message: `Unhandled error in schema: ${error.message}`,
+            path: context.path
+          }
+        ])
+      };
     }
   }
   optional() {
@@ -1235,9 +1212,274 @@ class Schema {
     return this;
   }
 }
+
+class SwitchSchema extends Schema {
+  constructor(config) {
+    super("switch", config);
+  }
+  selectCase(context) {
+    const {
+      select,
+      cases,
+      default: defaultSchema
+    } = this.config;
+    if (!select || !cases) {
+      return void 0;
+    }
+    const key = select(context);
+    return cases[key] || defaultSchema;
+  }
+  async _prepare(context) {
+    const preparedValue = await super._prepare(context);
+    const caseSchema = this.selectCase({ ...context, value: preparedValue });
+    if (caseSchema) {
+      return await caseSchema._prepare({ ...context, value: preparedValue });
+    }
+    return preparedValue;
+  }
+  async _validate(value, context) {
+    const caseSchema = this.selectCase(context);
+    if (caseSchema) {
+      return await caseSchema._validate(value, context);
+    }
+    const { failOnNoMatch } = this.config;
+    if (failOnNoMatch) {
+      const key = this.config.select(context);
+      throw new ValidationError([
+        {
+          path: context.path,
+          message: `No case matched for key "${key}" and no default was provided.`
+        }
+      ]);
+    }
+    return value;
+  }
+  async _transform(value, context) {
+    const transformedValue = await super._transform(value, context);
+    const caseSchema = this.selectCase({ ...context, value: transformedValue });
+    if (caseSchema) {
+      return await caseSchema._transform(transformedValue, context);
+    }
+    return transformedValue;
+  }
+}
+
+class ArraySchema extends Schema {
+  itemSchema;
+  constructor(itemSchema, config) {
+    const newConfig = { ...config };
+    if (newConfig.validate?.ofType) {
+      delete newConfig.validate.ofType;
+    }
+    super("array", newConfig);
+    this.itemSchema = itemSchema;
+  }
+  async _prepare(context) {
+    const preparedValue = await super._prepare(context);
+    if (!Array.isArray(preparedValue)) {
+      return preparedValue;
+    }
+    const preparedArray = [];
+    for (let i = 0; i < preparedValue.length; i++) {
+      const item = preparedValue[i];
+      const preparedItem = await this.itemSchema._prepare({
+        rootData: context.rootData,
+        path: [...context.path, i],
+        value: item,
+        ctx: context.ctx
+      });
+      preparedArray.push(preparedItem);
+    }
+    return preparedArray;
+  }
+  async _validate(value, context) {
+    if (this.config.optional && value === void 0) {
+      return [];
+    }
+    if (this.config.nullable && value === null) {
+      return null;
+    }
+    await super._validate(value, context);
+    const issues = [];
+    const newArray = [];
+    const itemPromises = value.map(async (item, i) => {
+      const newContext = {
+        rootData: context.rootData,
+        path: [...context.path, i],
+        value: item,
+        ctx: context.ctx
+      };
+      try {
+        const validatedItem = await this.itemSchema._validate(item, newContext);
+        newArray[i] = validatedItem;
+      } catch (error) {
+        if (error instanceof ValidationError) {
+          issues.push(...error.issues);
+        } else {
+          throw error;
+        }
+      }
+    });
+    await Promise.all(itemPromises);
+    if (issues.length > 0) {
+      throw new ValidationError(issues);
+    }
+    return newArray;
+  }
+  async _transform(value, context) {
+    const transformedValue = await super._transform(value, context);
+    if (!Array.isArray(transformedValue)) {
+      return transformedValue;
+    }
+    const newArray = [];
+    const itemPromises = transformedValue.map(async (item, i) => {
+      newArray[i] = await this.itemSchema._transform(item, {
+        rootData: context.rootData,
+        path: [...context.path, i],
+        value: item,
+        ctx: context.ctx
+      });
+    });
+    await Promise.all(itemPromises);
+    return newArray;
+  }
+}
+
 class ObjectSchema extends Schema {
   constructor(config) {
     super("object", config);
+  }
+  async _prepare(context) {
+    const preparedValue = await super._prepare(context);
+    if (preparedValue === null || preparedValue === void 0 || typeof preparedValue !== "object") {
+      return preparedValue;
+    }
+    const shape = this.getProperties();
+    const newValue = { ...preparedValue };
+    for (const key in shape) {
+      if (Object.prototype.hasOwnProperty.call(newValue, key)) {
+        const propertySchema = shape[key];
+        newValue[key] = await propertySchema._prepare({
+          rootData: context.rootData,
+          path: [...context.path, key],
+          value: newValue[key],
+          ctx: context.ctx
+        });
+      }
+    }
+    return newValue;
+  }
+  async _validate(value, context) {
+    if (this.config.optional && value === void 0) {
+      return void 0;
+    }
+    if (this.config.nullable && value === null) {
+      return null;
+    }
+    await super._validate(value, context);
+    const shape = this.getProperties();
+    const strict = this.config.strict;
+    const issues = [];
+    const newValue = {};
+    const propertyPromises = Object.keys(shape).map(async (key) => {
+      const propertySchema = shape[key];
+      const propertyValue = value[key];
+      const newContext = {
+        rootData: context.rootData,
+        path: [...context.path, key],
+        value: propertyValue,
+        ctx: context.ctx
+      };
+      try {
+        if (Object.prototype.hasOwnProperty.call(value, key)) {
+          const validatedValue = await propertySchema._validate(
+            propertyValue,
+            newContext
+          );
+          newValue[key] = validatedValue;
+        } else if (!propertySchema.config.optional) {
+          issues.push({
+            path: newContext.path,
+            message: `Required property '${key}' is missing`
+          });
+        }
+      } catch (error) {
+        if (error instanceof ValidationError) {
+          issues.push(...error.issues);
+        } else {
+          throw error;
+        }
+      }
+    });
+    await Promise.all(propertyPromises);
+    if (strict) {
+      for (const key in value) {
+        if (!shape[key]) {
+          issues.push({
+            path: [...context.path, key],
+            message: `Unrecognized key: '${key}'`
+          });
+        }
+      }
+    } else {
+      for (const key in value) {
+        if (!shape[key]) {
+          newValue[key] = value[key];
+        }
+      }
+    }
+    if (issues.length > 0) {
+      throw new ValidationError(issues);
+    }
+    for (const customValidator of this.customValidators) {
+      const result = typeof customValidator === "function" ? await customValidator(newValue, {
+        ...context,
+        value: newValue
+      }) : await customValidator.validator(newValue, {
+        ...context,
+        value: newValue
+      });
+      if (!result) {
+        let message;
+        if (typeof customValidator === "object" && customValidator.message) {
+          message = typeof customValidator.message === "string" ? customValidator.message : customValidator.message({
+            label: this.label,
+            value: newValue,
+            path: context.path,
+            dataType: this.dataType,
+            ctx: context.ctx,
+            args: [],
+            schema: this
+          });
+        }
+        issues.push({
+          path: context.path,
+          message: message ?? `Custom validation failed for ${this.dataType}`
+        });
+      }
+    }
+    if (issues.length > 0) {
+      throw new ValidationError(issues);
+    }
+    return newValue;
+  }
+  async _transform(value, context) {
+    const transformedValue = await super._transform(value, context);
+    const shape = this.getProperties();
+    const newValue = { ...transformedValue };
+    const transformPromises = Object.keys(shape).map(async (key) => {
+      if (Object.prototype.hasOwnProperty.call(newValue, key)) {
+        const propertySchema = shape[key];
+        newValue[key] = await propertySchema._transform(newValue[key], {
+          rootData: context.rootData,
+          path: [...context.path, key],
+          value: newValue[key],
+          ctx: context.ctx
+        });
+      }
+    });
+    await Promise.all(transformPromises);
+    return newValue;
   }
   getProperties() {
     const config = this.config;
@@ -1305,12 +1547,62 @@ class ObjectSchema extends Schema {
     return new ObjectSchema(newConfig);
   }
 }
+
 function createSchemaBuilder() {
   const builder = {};
   for (const plugin of plugins) {
     if (plugin.dataType === "switch") continue;
+    if (plugin.dataType === "array") {
+      builder.array = (itemSchemaOrConfig, config = {}) => {
+        if (itemSchemaOrConfig instanceof Schema) {
+          return new ArraySchema(itemSchemaOrConfig, config);
+        }
+        const configObj = itemSchemaOrConfig ?? {};
+        const itemSchema = configObj?.validate?.ofType ?? new Schema("any");
+        return new ArraySchema(itemSchema, configObj);
+      };
+      continue;
+    }
     if (plugin.dataType === "object") {
       builder.object = (config) => new ObjectSchema(config);
+      continue;
+    }
+    if (plugin.dataType === "literal") {
+      builder.literal = (value) => {
+        return new Schema("literal", { validate: { equals: value } });
+      };
+      continue;
+    }
+    if (plugin.dataType === "record") {
+      builder.record = (keySchema, valueSchema) => {
+        return new Schema("record", {
+          validate: { keysAndValues: [keySchema, valueSchema] }
+        });
+      };
+      continue;
+    }
+    if (plugin.dataType === "map") {
+      builder.map = (keySchema, valueSchema) => {
+        return new Schema("map", {
+          validate: { entries: [keySchema, valueSchema] }
+        });
+      };
+      continue;
+    }
+    if (plugin.dataType === "set") {
+      builder.set = (itemSchema) => {
+        return new Schema("set", {
+          validate: { items: itemSchema }
+        });
+      };
+      continue;
+    }
+    if (plugin.dataType === "instanceof") {
+      builder.instanceof = (constructor) => {
+        return new Schema("instanceof", {
+          validate: { constructor }
+        });
+      };
       continue;
     }
     builder[plugin.dataType] = (config) => {
@@ -1318,11 +1610,11 @@ function createSchemaBuilder() {
     };
   }
   builder.switch = (config) => {
-    return new Schema("switch", config);
+    return new SwitchSchema(config);
   };
   return builder;
 }
 const s = createSchemaBuilder();
 
-exports.Schema = Schema;
+exports.SwitchSchema = SwitchSchema;
 exports.s = s;

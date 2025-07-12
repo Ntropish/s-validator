@@ -1,9 +1,5 @@
-import {
-  definePlugin,
-  Schema,
-  ValidationError,
-  ValidationContext,
-} from "./types.js";
+import { definePlugin, ValidationError, ValidationContext } from "../types.js";
+import { Schema } from "../schemas/schema.js";
 
 export const unionPlugin = definePlugin({
   dataType: "union",

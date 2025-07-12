@@ -1,4 +1,4 @@
-import { definePlugin } from "./types.js";
+import { definePlugin } from "../types.js";
 import { regex } from "../regex.js";
 
 export const stringPlugin = definePlugin<string>({

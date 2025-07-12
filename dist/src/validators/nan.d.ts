@@ -1,1 +1,1 @@
-export declare const nanPlugin: import('./types.js').Validator<number, unknown>;
+export declare const nanPlugin: import('../types.js').Validator<number, unknown>;

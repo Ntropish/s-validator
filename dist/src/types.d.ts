@@ -1,4 +1,4 @@
-import { Schema } from '../index.js';
+import { Schema } from './schemas/schema.js';
 export interface SchemaLike {
     readonly config: Record<string, unknown>;
     parse(data: any, ctx?: any): any;
@@ -75,4 +75,42 @@ export type SafeParseError = {
     error: ValidationError;
 };
 export type SafeParseResult<T> = SafeParseSuccess<T> | SafeParseError;
-export { Schema };
+export type Prettify<T> = {
+    [K in keyof T]: T[K];
+} & {};
+export type UndefinedKeys<T> = {
+    [K in keyof T]: undefined extends T[K] ? K : never;
+}[keyof T];
+export type UndefinedToOptional<T> = Prettify<{
+    [K in Exclude<keyof T, UndefinedKeys<T>>]: T[K];
+} & {
+    [K in UndefinedKeys<T>]?: T[K];
+}>;
+export type CustomValidator<T> = ((value: T, context: ValidationContext) => boolean | Promise<boolean>) | {
+    validator: (value: T, context: ValidationContext) => boolean | Promise<boolean>;
+    message?: string;
+};
+export type ValidatorConfig<VCollection> = {
+    optional?: boolean;
+    nullable?: boolean;
+    label?: string;
+    messages?: Prettify<{
+        [K in keyof Omit<VCollection, "identity" | "messages" | "preparations" | "transformations">]?: string;
+    } & {
+        identity?: string;
+    }>;
+    prepare?: Record<string, any> & {
+        custom?: ((value: any) => any)[];
+    };
+    validate?: Record<string, any> & {
+        custom?: CustomValidator<any> | CustomValidator<any>[];
+    };
+    transform?: Record<string, any> & {
+        custom?: ((value: any) => any)[];
+    };
+};
+export type InferSchemaType<T extends Schema<any, any>> = T extends Schema<infer U, any> ? U : never;
+export type SObjectProperties = Record<string, Schema<any, any>>;
+export type InferSObjectType<P extends SObjectProperties> = Prettify<UndefinedToOptional<{
+    [K in keyof P]: InferSchemaType<P[K]>;
+}>>;

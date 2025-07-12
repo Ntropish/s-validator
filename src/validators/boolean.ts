@@ -1,4 +1,4 @@
-import { definePlugin } from "./types.js";
+import { definePlugin } from "../types.js";
 
 const truthyStrings = new Set(["true", "1", "yes", "on", "y", "enabled"]);
 const falsyStrings = new Set(["false", "0", "no", "off", "n", "disabled"]);

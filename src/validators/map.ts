@@ -1,10 +1,10 @@
 import {
   definePlugin,
-  Schema,
   ValidationError,
   ValidationIssue,
   ValidationContext,
-} from "./types.js";
+} from "../types.js";
+import { Schema } from "../schemas/schema.js";
 
 export const mapPlugin = definePlugin({
   dataType: "map",

@@ -1,4 +1,4 @@
-import { Validator, SchemaValidatorMap } from "./validators/types.js";
+import { Validator, SchemaValidatorMap } from "./types.js";
 import { anyPlugin } from "./validators/any.js";
 import { arrayPlugin } from "./validators/array.js";
 import { bigintPlugin } from "./validators/bigint.js";

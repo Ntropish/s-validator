@@ -1,1 +1,1 @@
-export declare const booleanPlugin: import('./types.js').Validator<boolean, unknown>;
+export declare const booleanPlugin: import('../types.js').Validator<boolean, unknown>;

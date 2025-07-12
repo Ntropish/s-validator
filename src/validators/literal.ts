@@ -1,4 +1,4 @@
-import { definePlugin } from "./types.js";
+import { definePlugin } from "../types.js";
 
 type Literal = string | number | boolean | null;
 

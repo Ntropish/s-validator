@@ -1,1 +1,1 @@
-export declare const unionPlugin: import('./types.js').Validator<any, unknown>;
+export declare const unionPlugin: import('../types.js').Validator<unknown, unknown>;
