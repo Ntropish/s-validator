@@ -26,9 +26,11 @@ describe("safeParse", () => {
 
   it("should collect multiple errors", async () => {
     const schema = s.object({
-      properties: {
-        name: s.string({ validate: { minLength: 4 }, label: "Full Name" }),
-        age: s.number({ validate: { min: 18 }, label: "User Age" }),
+      validate: {
+        properties: {
+          name: s.string({ validate: { minLength: 4 }, label: "Full Name" }),
+          age: s.number({ validate: { min: 18 }, label: "User Age" }),
+        },
       },
     });
 

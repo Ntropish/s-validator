@@ -35,12 +35,16 @@ describe("Standard Schema", () => {
 
   it("should map the issue path correctly", async () => {
     const schema = s.object({
-      properties: {
-        user: s.object({
-          properties: {
-            name: s.string({ validate: { minLength: 10 } }),
-          },
-        }),
+      validate: {
+        properties: {
+          user: s.object({
+            validate: {
+              properties: {
+                name: s.string({ validate: { minLength: 10 } }),
+              },
+            },
+          }),
+        },
       },
     });
 
@@ -57,9 +61,11 @@ describe("Standard Schema", () => {
 
   it("should infer types correctly", () => {
     const schema = s.object({
-      properties: {
-        name: s.string(),
-        age: s.number(),
+      validate: {
+        properties: {
+          name: s.string(),
+          age: s.number(),
+        },
       },
     });
 

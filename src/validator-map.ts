@@ -1,4 +1,4 @@
-import { Plugin, SchemaValidatorMap } from "./validators/types.js";
+import { Validator, SchemaValidatorMap } from "./validators/types.js";
 import { anyPlugin } from "./validators/any.js";
 import { arrayPlugin } from "./validators/array.js";
 import { bigintPlugin } from "./validators/bigint.js";
@@ -16,8 +16,9 @@ import { unknownPlugin } from "./validators/unknown.js";
 import { literalPlugin } from "./validators/literal.js";
 import { unionPlugin } from "./validators/union.js";
 import { recordPlugin } from "./validators/record.js";
+import { switchPlugin } from "./validators/switch.js";
 
-const plugins: Plugin[] = [
+export const plugins: Validator<any, any>[] = [
   anyPlugin,
   arrayPlugin,
   bigintPlugin,
@@ -33,6 +34,7 @@ const plugins: Plugin[] = [
   recordPlugin,
   setPlugin,
   stringPlugin,
+  switchPlugin,
   unionPlugin,
   unknownPlugin,
 ];
@@ -43,35 +45,29 @@ export const transformationMap: Record<string, any> = {};
 export const messageMap: Record<string, any> = {};
 
 for (const plugin of plugins) {
-  for (const dataType in plugin) {
-    if (!Object.prototype.hasOwnProperty.call(plugin, dataType)) continue;
+  const dataType = plugin.dataType;
+  validatorMap[dataType] = validatorMap[dataType] || {
+    identity: (value: any) => false,
+  };
+  preparationMap[dataType] = preparationMap[dataType] || {};
+  transformationMap[dataType] = transformationMap[dataType] || {};
+  messageMap[dataType] = messageMap[dataType] || {};
 
-    validatorMap[dataType] = validatorMap[dataType] || {
-      identity: (value: any) => false,
-    };
-    preparationMap[dataType] = preparationMap[dataType] || {};
-    transformationMap[dataType] = transformationMap[dataType] || {};
-    messageMap[dataType] = messageMap[dataType] || {};
-
-    const definitions = plugin[dataType as keyof typeof plugin]!;
-    for (const def of definitions) {
-      if (def.prepare) {
-        for (const name in def.prepare) {
-          preparationMap[dataType][name] = def.prepare[name];
-        }
-      }
-      if (def.validate) {
-        for (const name in def.validate) {
-          const validatorDef = def.validate[name]!;
-          validatorMap[dataType][name] = validatorDef.validator;
-          messageMap[dataType][name] = validatorDef.message;
-        }
-      }
-      if (def.transform) {
-        for (const name in def.transform) {
-          transformationMap[dataType][name] = def.transform[name];
-        }
-      }
+  if (plugin.prepare) {
+    for (const name in plugin.prepare) {
+      preparationMap[dataType][name] = plugin.prepare[name];
+    }
+  }
+  if (plugin.validate) {
+    for (const name in plugin.validate) {
+      const validatorDef = plugin.validate[name]!;
+      validatorMap[dataType][name] = validatorDef.validator;
+      messageMap[dataType][name] = validatorDef.message;
+    }
+  }
+  if (plugin.transform) {
+    for (const name in plugin.transform) {
+      transformationMap[dataType][name] = plugin.transform[name];
     }
   }
 }

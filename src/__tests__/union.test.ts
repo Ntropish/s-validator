@@ -45,15 +45,19 @@ describe("Union Validator", () => {
 
   it("should work with object schemas", async () => {
     const schemaA = s.object({
-      properties: {
-        type: s.literal({ validate: { identity: "a" } }),
-        a: s.string(),
+      validate: {
+        properties: {
+          type: s.literal({ validate: { identity: "a" } }),
+          a: s.string(),
+        },
       },
     });
     const schemaB = s.object({
-      properties: {
-        type: s.literal({ validate: { identity: "b" } }),
-        b: s.number(),
+      validate: {
+        properties: {
+          type: s.literal({ validate: { identity: "b" } }),
+          b: s.number(),
+        },
       },
     });
     const schema = s.union({ validate: { identity: [schemaA, schemaB] } });

@@ -75,15 +75,28 @@ export type ValidatorCollection<T = any> = {
   [validatorName: string]: ValidatorDefinition<T>;
 };
 
-export interface PluginDataTypeConfiguration {
-  prepare?: PreparationCollection;
-  transform?: TransformationCollection;
-  validate?: ValidatorCollection;
-}
-
-export type Plugin = {
-  [dataType: string]: PluginDataTypeConfiguration[];
+export type Validator<TOutput, TInput = unknown> = {
+  dataType: string;
+  prepare?: PreparationCollection<TInput>;
+  transform?: TransformationCollection<TOutput>;
+  validate?: ValidatorCollection<TOutput> & {
+    identity: {
+      validator: (
+        value: unknown,
+        args: any[],
+        context: ValidationContext,
+        schema: Schema<any, any>
+      ) => boolean | Promise<boolean>;
+      message: MessageProducer;
+    };
+  };
 };
+
+export function definePlugin<TOutput, TInput = unknown>(
+  plugin: Validator<TOutput, TInput>
+): Validator<TOutput, TInput> {
+  return plugin;
+}
 
 // The main map of all data types to their validator collections.
 export type SchemaValidatorMap = {

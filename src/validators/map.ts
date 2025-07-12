@@ -1,51 +1,49 @@
 import {
-  type Plugin,
+  definePlugin,
   type ValidatorDefinition,
   Schema,
   ValidationError,
+  ValidationContext,
 } from "./types.js";
 
-export const mapPlugin: Plugin = {
-  map: [
-    {
-      validate: {
-        identity: {
-          validator: async (
-            value: unknown,
-            [keySchema, valueSchema]: [
-              Schema<any, any> | undefined,
-              Schema<any, any> | undefined
-            ],
-            context
-          ) => {
-            if (!(value instanceof Map)) return false;
-            if (!keySchema || !valueSchema) return false;
+export const mapPlugin = definePlugin<Map<any, any>>({
+  dataType: "map",
+  validate: {
+    identity: {
+      validator: async (
+        value: unknown,
+        [keySchema, valueSchema]: [
+          Schema<any, any> | undefined,
+          Schema<any, any> | undefined
+        ],
+        context: ValidationContext
+      ) => {
+        if (!(value instanceof Map)) return false;
+        if (!keySchema || !valueSchema) return false;
 
-            const issues: ValidationError[] = [];
+        const issues: ValidationError[] = [];
 
-            for (const [key, val] of value.entries()) {
-              try {
-                await keySchema.parse(key, context);
-                await valueSchema.parse(val, context);
-              } catch (e) {
-                if (e instanceof ValidationError) {
-                  issues.push(e);
-                } else {
-                  throw e;
-                }
-              }
+        for (const [key, val] of value.entries()) {
+          try {
+            await keySchema.parse(key, context);
+            await valueSchema.parse(val, context);
+          } catch (e) {
+            if (e instanceof ValidationError) {
+              issues.push(e);
+            } else {
+              throw e;
             }
+          }
+        }
 
-            if (issues.length > 0) {
-              throw new ValidationError(issues.flatMap((e) => e.issues));
-            }
+        if (issues.length > 0) {
+          throw new ValidationError(issues.flatMap((e) => e.issues));
+        }
 
-            return true;
-          },
-          message: (ctx) =>
-            `Invalid type. Expected Map, received ${typeof ctx.value}.`,
-        },
-      } as Record<string, ValidatorDefinition<any>>,
+        return true;
+      },
+      message: (ctx) =>
+        `Invalid type. Expected Map, received ${typeof ctx.value}.`,
     },
-  ],
-};
+  },
+});

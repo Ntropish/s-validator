@@ -1,355 +1,400 @@
-const anyPlugin = {
-  any: [
-    {
-      validate: {
-        identity: {
-          validator: (value) => true,
-          message: (ctx) => "Invalid value."
-          // This should ideally never be reached
-        }
-      }
-    }
-  ]
-};
+function definePlugin(plugin) {
+  return plugin;
+}
+class ValidationError extends Error {
+  issues;
+  constructor(issues) {
+    super(issues[0]?.message || "Validation failed");
+    this.issues = issues;
+    this.name = "ValidationError";
+  }
+}
 
-const arrayPlugin = {
-  array: [
-    {
-      validate: {
-        identity: {
-          validator: (value) => Array.isArray(value),
-          message: (ctx) => `Invalid type. Expected array, received ${typeof ctx.value}.`
-        },
-        length: {
-          validator: (value, [length]) => value.length === length,
-          message: (ctx) => `${ctx.label} must contain exactly ${ctx.args[0]} items.`
-        },
-        minLength: {
-          validator: (value, [minLength]) => value.length >= minLength,
-          message: (ctx) => `${ctx.label} must contain at least ${ctx.args[0]} items.`
-        },
-        maxLength: {
-          validator: (value, [maxLength]) => value.length <= maxLength,
-          message: (ctx) => `${ctx.label} must contain at most ${ctx.args[0]} items.`
-        },
-        nonEmpty: {
-          validator: (value) => value.length > 0,
-          message: (ctx) => `${ctx.label} must not be empty.`
-        },
-        contains: {
-          validator: (value, [element]) => value.includes(element),
-          message: (ctx) => `${ctx.label} must contain the element ${ctx.args[0]}.`
-        },
-        excludes: {
-          validator: (value, [element]) => !value.includes(element),
-          message: (ctx) => `${ctx.label} must not contain the element ${ctx.args[0]}.`
-        },
-        unique: {
-          validator: (value) => new Set(value).size === value.length,
-          message: (ctx) => `${ctx.label} must contain unique items.`
-        },
-        items: {
-          validator: () => true,
-          // Placeholder
-          message: (ctx) => `Invalid item in ${ctx.label}.`
-          // Placeholder
-        }
-      }
+const anyPlugin = definePlugin({
+  dataType: "any",
+  validate: {
+    identity: {
+      validator: (value) => true,
+      message: (ctx) => "Invalid value."
+      // This should ideally never be reached
     }
-  ]
-};
+  }
+});
 
-const bigintPlugin = {
-  bigint: [
-    {
-      prepare: {
-        coerce: (value, [enabled]) => {
-          if (enabled === false) {
-            return value;
-          }
-          if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-            try {
-              return BigInt(value);
-            } catch {
-              return value;
-            }
-          }
+const arrayPlugin = definePlugin({
+  dataType: "array",
+  validate: {
+    identity: {
+      validator: (value) => Array.isArray(value),
+      message: (ctx) => `Invalid type. Expected array, received ${typeof ctx.value}.`
+    },
+    length: {
+      validator: (value, [length]) => value.length === length,
+      message: (ctx) => `${ctx.label} must contain exactly ${ctx.args[0]} items.`
+    },
+    minLength: {
+      validator: (value, [minLength]) => value.length >= minLength,
+      message: (ctx) => `${ctx.label} must contain at least ${ctx.args[0]} items.`
+    },
+    maxLength: {
+      validator: (value, [maxLength]) => value.length <= maxLength,
+      message: (ctx) => `${ctx.label} must contain at most ${ctx.args[0]} items.`
+    },
+    nonEmpty: {
+      validator: (value) => value.length > 0,
+      message: (ctx) => `${ctx.label} must not be empty.`
+    },
+    contains: {
+      validator: (value, [element]) => value.includes(element),
+      message: (ctx) => `${ctx.label} must contain the element ${ctx.args[0]}.`
+    },
+    excludes: {
+      validator: (value, [element]) => !value.includes(element),
+      message: (ctx) => `${ctx.label} must not contain the element ${ctx.args[0]}.`
+    },
+    unique: {
+      validator: (value) => new Set(value).size === value.length,
+      message: (ctx) => `${ctx.label} must contain unique items.`
+    },
+    items: {
+      validator: () => true,
+      // Placeholder
+      message: (ctx) => `Invalid item in ${ctx.label}.`
+      // Placeholder
+    }
+  }
+});
+
+const bigintPlugin = definePlugin({
+  dataType: "bigint",
+  prepare: {
+    coerce: (value, [enabled]) => {
+      if (enabled === false) {
+        return value;
+      }
+      if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+        try {
+          return BigInt(value);
+        } catch {
           return value;
         }
-      },
-      validate: {
-        identity: {
-          validator: (value) => typeof value === "bigint",
-          message: (ctx) => `Invalid type. Expected bigint, received ${typeof ctx.value}.`
-        }
       }
+      return value;
     }
-  ]
-};
+  },
+  validate: {
+    identity: {
+      validator: (value) => typeof value === "bigint",
+      message: (ctx) => `Invalid type. Expected bigint, received ${typeof ctx.value}.`
+    }
+  }
+});
 
 const truthyStrings = /* @__PURE__ */ new Set(["true", "1", "yes", "on", "y", "enabled"]);
 const falsyStrings = /* @__PURE__ */ new Set(["false", "0", "no", "off", "n", "disabled"]);
-const booleanPlugin = {
-  boolean: [
-    {
-      prepare: {
-        coerce: (value, [enabled]) => {
-          if (enabled === false) {
-            return value;
-          }
-          return !!value;
-        },
-        stringBool: (value, [enabled]) => {
-          if (enabled === false) {
-            return value;
-          }
-          if (typeof value === "string") {
-            const lowerValue = value.toLowerCase();
-            if (truthyStrings.has(lowerValue)) {
-              return true;
-            }
-            if (falsyStrings.has(lowerValue)) {
-              return false;
-            }
-          }
-          return value;
+const booleanPlugin = definePlugin({
+  dataType: "boolean",
+  prepare: {
+    coerce: (value, [enabled]) => {
+      if (enabled === false) {
+        return value;
+      }
+      return !!value;
+    },
+    stringBool: (value, [enabled]) => {
+      if (enabled === false) {
+        return value;
+      }
+      if (typeof value === "string") {
+        const lowerValue = value.toLowerCase();
+        if (truthyStrings.has(lowerValue)) {
+          return true;
         }
+        if (falsyStrings.has(lowerValue)) {
+          return false;
+        }
+      }
+      return value;
+    }
+  },
+  validate: {
+    identity: {
+      validator: (value) => typeof value === "boolean",
+      message: (ctx) => `Invalid type. Expected boolean, received ${typeof ctx.value}.`
+    },
+    required: {
+      validator: (value) => typeof value === "boolean",
+      message: (ctx) => `${ctx.label} is required.`
+    }
+  }
+});
+
+const datePlugin = definePlugin({
+  dataType: "date",
+  prepare: {
+    coerce: (value, [enabled]) => {
+      if (enabled === false) {
+        return value;
+      }
+      if (value instanceof Date) {
+        return value;
+      }
+      if (typeof value === "string" || typeof value === "number") {
+        const date = new Date(value);
+        if (!isNaN(date.getTime())) {
+          return date;
+        }
+      }
+      return value;
+    }
+  },
+  validate: {
+    identity: {
+      validator: (value) => value instanceof Date,
+      message: (ctx) => `Invalid type. Expected Date, received ${typeof ctx.value}.`
+    },
+    min: {
+      validator: (value, [minDate]) => value.getTime() >= minDate.getTime(),
+      message: (ctx) => `${ctx.label} must be on or after ${new Date(
+        ctx.args[0]
+      ).toDateString()}.`
+    },
+    max: {
+      validator: (value, [maxDate]) => value.getTime() <= maxDate.getTime(),
+      message: (ctx) => `${ctx.label} must be on or before ${new Date(
+        ctx.args[0]
+      ).toDateString()}.`
+    }
+  }
+});
+
+const instanceofPlugin = definePlugin({
+  dataType: "instanceof",
+  validate: {
+    identity: {
+      validator: (value, [constructor]) => {
+        if (!constructor) return false;
+        return value instanceof constructor;
       },
-      validate: {
-        identity: {
-          validator: (value) => typeof value === "boolean",
-          message: (ctx) => `Invalid type. Expected boolean, received ${typeof ctx.value}.`
-        },
-        required: {
-          validator: (value) => typeof value === "boolean",
-          message: (ctx) => `${ctx.label} is required.`
-        }
+      message: (ctx) => {
+        const constructorName = ctx.args[0]?.name || "Unknown";
+        return `Value must be an instance of ${constructorName}.`;
       }
     }
-  ]
-};
+  }
+});
 
-const datePlugin = {
-  date: [
-    {
-      prepare: {
-        coerce: (value, [enabled]) => {
-          if (enabled === false) {
-            return value;
-          }
-          if (value instanceof Date) {
-            return value;
-          }
-          if (typeof value === "string" || typeof value === "number") {
-            const date = new Date(value);
-            if (!isNaN(date.getTime())) {
-              return date;
+const mapPlugin = definePlugin({
+  dataType: "map",
+  validate: {
+    identity: {
+      validator: async (value, [keySchema, valueSchema], context) => {
+        if (!(value instanceof Map)) return false;
+        if (!keySchema || !valueSchema) return false;
+        const issues = [];
+        for (const [key, val] of value.entries()) {
+          try {
+            await keySchema.parse(key, context);
+            await valueSchema.parse(val, context);
+          } catch (e) {
+            if (e instanceof ValidationError) {
+              issues.push(e);
+            } else {
+              throw e;
             }
           }
-          return value;
         }
+        if (issues.length > 0) {
+          throw new ValidationError(issues.flatMap((e) => e.issues));
+        }
+        return true;
       },
-      validate: {
-        identity: {
-          validator: (value) => value instanceof Date,
-          message: (ctx) => `Invalid type. Expected Date, received ${typeof ctx.value}.`
-        },
-        min: {
-          validator: (value, [minDate]) => value.getTime() >= minDate.getTime(),
-          message: (ctx) => `${ctx.label} must be on or after ${new Date(
-            ctx.args[0]
-          ).toDateString()}.`
-        },
-        max: {
-          validator: (value, [maxDate]) => value.getTime() <= maxDate.getTime(),
-          message: (ctx) => `${ctx.label} must be on or before ${new Date(
-            ctx.args[0]
-          ).toDateString()}.`
-        }
-      }
+      message: (ctx) => `Invalid type. Expected Map, received ${typeof ctx.value}.`
     }
-  ]
-};
+  }
+});
 
-const instanceofPlugin = {
-  instanceof: [
-    {
-      validate: {
-        identity: {
-          validator: (value, args, context, schema) => {
-            const constructorFn = schema.constructorFn;
-            if (!constructorFn) {
-              return false;
+const nanPlugin = definePlugin({
+  dataType: "nan",
+  validate: {
+    identity: {
+      validator: (value) => Number.isNaN(value),
+      message: (ctx) => `Value must be NaN.`
+    }
+  }
+});
+
+const neverPlugin = definePlugin({
+  dataType: "never",
+  validate: {
+    identity: {
+      validator: (value) => false,
+      message: (ctx) => `Value must be of type never.`
+    }
+  }
+});
+
+const numberPlugin = definePlugin({
+  dataType: "number",
+  prepare: {
+    coerce: (value, [enabled]) => {
+      if (enabled === false) {
+        return value;
+      }
+      if (typeof value === "number") {
+        return value;
+      }
+      if (typeof value === "string" && /^-?\d+(\.\d+)?$/.test(value)) {
+        return parseFloat(value);
+      }
+      return value;
+    }
+  },
+  validate: {
+    identity: {
+      validator: (value) => typeof value === "number",
+      message: (ctx) => `Invalid type. Expected number, received ${typeof ctx.value}.`
+    },
+    min: {
+      validator: (value, [min]) => value >= min,
+      message: (ctx) => `${ctx.label} must be at least ${ctx.args[0]}.`
+    },
+    max: {
+      validator: (value, [max]) => value <= max,
+      message: (ctx) => `${ctx.label} must be at most ${ctx.args[0]}.`
+    },
+    gt: {
+      validator: (value, [num]) => value > num,
+      message: (ctx) => `${ctx.label} must be greater than ${ctx.args[0]}.`
+    },
+    gte: {
+      validator: (value, [num]) => value >= num,
+      message: (ctx) => `${ctx.label} must be greater than or equal to ${ctx.args[0]}.`
+    },
+    lt: {
+      validator: (value, [num]) => value < num,
+      message: (ctx) => `${ctx.label} must be less than ${ctx.args[0]}.`
+    },
+    lte: {
+      validator: (value, [num]) => value <= num,
+      message: (ctx) => `${ctx.label} must be less than or equal to ${ctx.args[0]}.`
+    },
+    range: {
+      validator: (value, [[min, max]]) => value >= min && value <= max,
+      message: (ctx) => `${ctx.label} must be between ${ctx.args[0][0]} and ${ctx.args[0][1]}.`
+    },
+    exclusiveRange: {
+      validator: (value, [[min, max]]) => value > min && value < max,
+      message: (ctx) => `${ctx.label} must be strictly between ${ctx.args[0][0]} and ${ctx.args[0][1]}.`
+    },
+    multipleOf: {
+      validator: (value, [multipleOf]) => value % multipleOf === 0,
+      message: (ctx) => `${ctx.label} must be a multiple of ${ctx.args[0]}.`
+    },
+    integer: {
+      validator: (value, [enabled]) => {
+        if (enabled === void 0 || enabled === false) return true;
+        return Number.isInteger(value);
+      },
+      message: (ctx) => `${ctx.label} must be an integer.`
+    },
+    safe: {
+      validator: (value, [enabled]) => {
+        if (enabled === void 0 || enabled === false) return true;
+        return Number.isSafeInteger(value);
+      },
+      message: (ctx) => `${ctx.label} must be a safe integer.`
+    },
+    positive: {
+      validator: (value) => value > 0,
+      message: (ctx) => `${ctx.label} must be positive.`
+    },
+    negative: {
+      validator: (value) => value < 0,
+      message: (ctx) => `${ctx.label} must be negative.`
+    }
+  }
+});
+
+const objectPlugin = definePlugin({
+  dataType: "object",
+  validate: {
+    identity: {
+      validator: async (value, args, context, schema) => {
+        if (typeof value !== "object" || value === null || Array.isArray(value)) {
+          return false;
+        }
+        const config = schema.config;
+        const properties = config.validate?.properties;
+        if (!properties) return true;
+        const issues = [];
+        const allKeys = /* @__PURE__ */ new Set([
+          ...Object.keys(value),
+          ...Object.keys(properties)
+        ]);
+        for (const key of allKeys) {
+          const schema2 = properties[key];
+          const propertyValue = value[key];
+          const childContext = {
+            ...context,
+            path: [...context.path, key],
+            value: propertyValue
+          };
+          if (schema2) {
+            try {
+              await schema2.parse(propertyValue, childContext);
+            } catch (e) {
+              if (e instanceof ValidationError) {
+                issues.push(...e.issues);
+              } else {
+                throw e;
+              }
             }
-            return value instanceof constructorFn;
-          },
-          message: (ctx) => {
-            const constructorName = ctx.schema.constructorFn?.name || "Unknown";
-            return `Value must be an instance of ${constructorName}.`;
+          } else if (config.strict && Object.prototype.hasOwnProperty.call(value, key)) {
+            issues.push({
+              path: childContext.path,
+              message: `Unrecognized key: '${key}'`
+            });
           }
         }
-      }
-    }
-  ]
-};
-
-const mapPlugin = {
-  map: [
-    {
-      validate: {
-        identity: {
-          validator: (value) => value instanceof Map,
-          message: (ctx) => `Invalid type. Expected Map, received ${typeof ctx.value}.`
+        if (issues.length > 0) {
+          throw new ValidationError(issues);
         }
-      }
-    }
-  ]
-};
-
-const nanPlugin = {
-  nan: [
-    {
-      validate: {
-        identity: {
-          validator: (value) => Number.isNaN(value),
-          message: (ctx) => `Value must be NaN.`
-        }
-      }
-    }
-  ]
-};
-
-const neverPlugin = {
-  never: [
-    {
-      validate: {
-        identity: {
-          validator: (value) => false,
-          message: (ctx) => `Value must be of type never.`
-        }
-      }
-    }
-  ]
-};
-
-const numberPlugin = {
-  number: [
-    {
-      prepare: {
-        coerce: (value, [enabled]) => {
-          if (enabled === false) {
-            return value;
-          }
-          if (typeof value === "number") {
-            return value;
-          }
-          if (typeof value === "string" && /^-?\d+(\.\d+)?$/.test(value)) {
-            return parseFloat(value);
-          }
-          return value;
-        }
+        return true;
       },
-      validate: {
-        identity: {
-          validator: (value) => typeof value === "number",
-          message: (ctx) => `Invalid type. Expected ${ctx.dataType}, received ${typeof ctx.value}.`
-        },
-        min: {
-          validator: (value, [min]) => value >= min,
-          message: (ctx) => `${ctx.label} must be at least ${ctx.args[0]}.`
-        },
-        max: {
-          validator: (value, [max]) => value <= max,
-          message: (ctx) => `${ctx.label} must be at most ${ctx.args[0]}.`
-        },
-        gt: {
-          validator: (value, [num]) => value > num,
-          message: (ctx) => `${ctx.label} must be greater than ${ctx.args[0]}.`
-        },
-        gte: {
-          validator: (value, [num]) => value >= num,
-          message: (ctx) => `${ctx.label} must be greater than or equal to ${ctx.args[0]}.`
-        },
-        lt: {
-          validator: (value, [num]) => value < num,
-          message: (ctx) => `${ctx.label} must be less than ${ctx.args[0]}.`
-        },
-        lte: {
-          validator: (value, [num]) => value <= num,
-          message: (ctx) => `${ctx.label} must be less than or equal to ${ctx.args[0]}.`
-        },
-        range: {
-          validator: (value, [[min, max]]) => value >= min && value <= max,
-          message: (ctx) => `${ctx.label} must be between ${ctx.args[0][0]} and ${ctx.args[0][1]}.`
-        },
-        exclusiveRange: {
-          validator: (value, [[min, max]]) => value > min && value < max,
-          message: (ctx) => `${ctx.label} must be strictly between ${ctx.args[0][0]} and ${ctx.args[0][1]}.`
-        },
-        multipleOf: {
-          validator: (value, [multipleOf]) => value % multipleOf === 0,
-          message: (ctx) => `${ctx.label} must be a multiple of ${ctx.args[0]}.`
-        },
-        integer: {
-          validator: (value, [enabled]) => {
-            if (enabled === void 0) return true;
-            return enabled ? Number.isInteger(value) : !Number.isInteger(value);
-          },
-          message: (ctx) => `${ctx.label} must be an integer.`
-        },
-        port: {
-          validator: (value, [enabled]) => {
-            if (enabled === void 0) return true;
-            const isPort = Number.isInteger(value) && value >= 0 && value <= 65535;
-            return enabled ? isPort : !isPort;
-          },
-          message: (ctx) => `${ctx.label} must be a valid port number.`
-        },
-        safe: {
-          validator: (value, [enabled]) => {
-            if (enabled === void 0) return true;
-            return enabled ? Number.isSafeInteger(value) : !Number.isSafeInteger(value);
-          },
-          message: (ctx) => `${ctx.label} must be a safe integer.`
-        },
-        positive: {
-          validator: (value) => value > 0,
-          message: (ctx) => `${ctx.label} must be positive.`
-        },
-        negative: {
-          validator: (value) => value < 0,
-          message: (ctx) => `${ctx.label} must be negative.`
-        }
-      }
+      message: (ctx) => `Invalid type. Expected object, received ${typeof ctx.value}.`
     }
-  ]
-};
+  }
+});
 
-const objectPlugin = {
-  object: [
-    {
-      validate: {
-        identity: {
-          validator: (value) => typeof value === "object" && value !== null && !Array.isArray(value),
-          message: (ctx) => `Invalid type. Expected object, received ${typeof ctx.value}.`
+const setPlugin = definePlugin({
+  dataType: "set",
+  validate: {
+    identity: {
+      validator: async (value, [valueSchema], context) => {
+        if (!(value instanceof Set)) return false;
+        if (!valueSchema) return false;
+        const issues = [];
+        for (const val of value.values()) {
+          try {
+            await valueSchema.parse(val, context);
+          } catch (e) {
+            if (e instanceof ValidationError) {
+              issues.push(e);
+            } else {
+              throw e;
+            }
+          }
         }
-      }
-    }
-  ]
-};
-
-const setPlugin = {
-  set: [
-    {
-      validate: {
-        identity: {
-          validator: (value) => value instanceof Set,
-          message: (ctx) => `Invalid type. Expected Set, received ${typeof ctx.value}.`
+        if (issues.length > 0) {
+          throw new ValidationError(issues.flatMap((e) => e.issues));
         }
-      }
+        return true;
+      },
+      message: (ctx) => `Invalid type. Expected Set, received ${typeof ctx.value}.`
     }
-  ]
-};
+  }
+});
 
 /**
  * @license
@@ -448,264 +493,368 @@ const regex = {
   uuidV7: /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 };
 
-const stringPlugin = {
-  string: [
-    {
-      prepare: {
-        coerce: (value, [enabled]) => {
-          if (enabled === false) {
-            return value;
-          }
-          if (typeof value === "string") {
-            return value;
-          }
-          if (value === null || value === void 0 || typeof value === "object" && !value.toString) {
-            return value;
-          }
-          return String(value);
-        },
-        trim: (value, [enabled]) => {
-          if (enabled === false) {
-            return value;
-          }
-          return typeof value === "string" ? value.trim() : value;
-        },
-        toLowerCase: (value, [enabled]) => {
-          if (enabled === false) {
-            return value;
-          }
-          return typeof value === "string" ? value.toLowerCase() : value;
-        }
-      },
-      transform: {
-        toUpperCase: (value) => value.toUpperCase(),
-        toLowerCase: (value) => value.toLowerCase(),
-        trim: (value) => value.trim()
-      },
-      validate: {
-        identity: {
-          validator: (value) => typeof value === "string",
-          message: (ctx) => `Invalid type. Expected ${ctx.dataType}, received ${typeof ctx.value}.`
-        },
-        length: {
-          validator: (value, [length]) => value.length === length,
-          message: (ctx) => `${ctx.label} must be exactly ${ctx.args[0]} characters long.`
-        },
-        minLength: {
-          validator: (value, [minLength]) => value.length >= minLength,
-          message: (ctx) => `${ctx.label} must be at least ${ctx.args[0]} characters long.`
-        },
-        maxLength: {
-          validator: (value, [maxLength]) => value.length <= maxLength,
-          message: (ctx) => `${ctx.label} must be at most ${ctx.args[0]} characters long.`
-        },
-        range: {
-          validator: (value, [[min, max]]) => value.length >= min && value.length <= max,
-          message: (ctx) => `${ctx.label} must be between ${ctx.args[0][0]} and ${ctx.args[0][1]} characters long.`
-        },
-        exclusiveRange: {
-          validator: (value, [[min, max]]) => value.length > min && value.length < max,
-          message: (ctx) => `${ctx.label} must be strictly between ${ctx.args[0][0]} and ${ctx.args[0][1]} characters long.`
-        },
-        pattern: {
-          validator: (value, [pattern]) => pattern.test(value),
-          message: (ctx) => `${ctx.label} does not match the required pattern.`
-        },
-        oneOf: {
-          validator: (value, [options]) => options.includes(value),
-          message: (ctx) => `${ctx.label} must be one of the following values: ${ctx.args[0].join(", ")}`
-        },
-        cuid: {
-          validator: (value, [enabled]) => {
-            if (enabled === void 0) return true;
-            return enabled ? regex.cuid.test(value) : !regex.cuid.test(value);
-          },
-          message: (ctx) => `${ctx.label} must be a valid CUID.`
-        },
-        cuid2: {
-          validator: (value, [enabled]) => {
-            if (enabled === void 0) return true;
-            return enabled ? regex.cuid2.test(value) : !regex.cuid2.test(value);
-          },
-          message: (ctx) => `${ctx.label} must be a valid CUID2.`
-        },
-        ulid: {
-          validator: (value, [enabled = true]) => {
-            return enabled ? regex.ulid.test(value) : !regex.ulid.test(value);
-          },
-          message: (ctx) => `${ctx.label} must be a valid ULID.`
-        },
-        emoji: {
-          validator: (value, [enabled]) => {
-            if (enabled === void 0) return true;
-            return enabled ? regex.emoji.test(value) : !regex.emoji.test(value);
-          },
-          message: (ctx) => `${ctx.label} must be a valid emoji.`
-        },
-        ipv4: {
-          validator: (value, [enabled]) => {
-            if (enabled === void 0) return true;
-            return enabled ? regex.ipv4.test(value) : !regex.ipv4.test(value);
-          },
-          message: (ctx) => `${ctx.label} must be a valid IPv4 address.`
-        },
-        ipv4Cidr: {
-          validator: (value, [enabled]) => {
-            if (enabled === void 0) return true;
-            return enabled ? regex.cidrv4.test(value) : !regex.cidrv4.test(value);
-          },
-          message: (ctx) => `${ctx.label} must be a valid IPv4 CIDR.`
-        },
-        ipv6: {
-          validator: (value, [enabled]) => {
-            if (enabled === void 0) return true;
-            return enabled ? regex.ipv6.test(value) : !regex.ipv6.test(value);
-          },
-          message: (ctx) => `${ctx.label} must be a valid IPv6 address.`
-        },
-        ipv6Cidr: {
-          validator: (value, [enabled]) => {
-            if (enabled === void 0) return true;
-            return enabled ? regex.cidrv6.test(value) : !regex.cidrv6.test(value);
-          },
-          message: (ctx) => `${ctx.label} must be a valid IPv6 CIDR.`
-        },
-        base64: {
-          validator: (value, [enabled]) => {
-            if (enabled === void 0) return true;
-            return enabled ? regex.base64.test(value) : !regex.base64.test(value);
-          },
-          message: (ctx) => `${ctx.label} must be a valid base64 string.`
-        },
-        base64Url: {
-          validator: (value, [enabled]) => {
-            if (enabled === void 0) return true;
-            return enabled ? regex.base64url.test(value) : !regex.base64url.test(value);
-          },
-          message: (ctx) => `${ctx.label} must be a valid base64url string.`
-        },
-        date: {
-          validator: (value, [enabled]) => {
-            if (enabled === void 0) return true;
-            return enabled ? regex.isoDate.test(value) : !regex.isoDate.test(value);
-          },
-          message: (ctx) => `${ctx.label} must be a valid date string.`
-        },
-        time: {
-          validator: (value, [enabled]) => {
-            if (enabled === void 0) return true;
-            return enabled ? regex.isoTime.test(value) : !regex.isoTime.test(value);
-          },
-          message: (ctx) => `${ctx.label} must be a valid time string.`
-        },
-        duration: {
-          validator: (value, [enabled]) => {
-            if (enabled === void 0) return true;
-            return enabled ? regex.isoDuration.test(value) : !regex.isoDuration.test(value);
-          },
-          message: (ctx) => `${ctx.label} must be a valid duration string.`
-        },
-        hexColor: {
-          validator: (value, [enabled]) => {
-            if (enabled === void 0) return true;
-            return enabled ? regex.hexColor.test(value) : !regex.hexColor.test(value);
-          },
-          message: (ctx) => `${ctx.label} must be a valid hex color.`
-        },
-        semver: {
-          validator: (value, [enabled]) => {
-            if (enabled === void 0) return true;
-            return enabled ? regex.semver.test(value) : !regex.semver.test(value);
-          },
-          message: (ctx) => `${ctx.label} must be a valid semver string.`
-        },
-        url: {
-          validator: (value, [enabled = true]) => {
-            return enabled ? regex.url.test(value) : !regex.url.test(value);
-          },
-          message: (ctx) => `${ctx.label} must be a valid URL.`
-        },
-        uuid: {
-          validator: (value, [enabled]) => {
-            if (enabled === void 0) return true;
-            return enabled ? regex.uuid.test(value) : !regex.uuid.test(value);
-          },
-          message: (ctx) => `${ctx.label} must be a valid UUID.`
-        },
-        uuidV7: {
-          validator: (value, [enabled = true]) => {
-            return enabled ? regex.uuidV7.test(value) : !regex.uuidV7.test(value);
-          },
-          message: (ctx) => `${ctx.label} must be a valid UUIDv7.`
-        },
-        datetime: {
-          validator: (value, [enabled]) => {
-            if (enabled === void 0) return true;
-            return enabled ? regex.isoDateTime.test(value) : !regex.isoDateTime.test(value);
-          },
-          message: (ctx) => `${ctx.label} must be a valid datetime string.`
-        },
-        json: {
-          validator: async (value, [schema]) => {
-            let parsed;
-            try {
-              parsed = JSON.parse(value);
-            } catch (e) {
-              return false;
-            }
-            const result = await schema.safeParse(parsed);
-            return result.status === "success";
-          },
-          message: (ctx) => `${ctx.label} must be a valid JSON string.`
-        },
-        email: {
-          validator: (value, [config]) => {
-            if (config === void 0) {
-              return true;
-            }
-            if (typeof config === "object") {
-              if (!regex.email.test(value)) {
-                return false;
-              }
-              const domain = value.substring(value.lastIndexOf("@") + 1);
-              if (config.denied) {
-                for (const rule of config.denied) {
-                  if (rule instanceof RegExp ? rule.test(domain) : rule === domain) {
-                    return false;
-                  }
-                }
-              }
-              if (config.allowed) {
-                for (const rule of config.allowed) {
-                  if (rule instanceof RegExp ? rule.test(domain) : rule === domain) {
-                    return true;
-                  }
-                }
-                return false;
-              }
-              return true;
-            }
-            return config ? regex.email.test(value) : !regex.email.test(value);
-          },
-          message: (ctx) => `${ctx.label} must be a valid email address.`
-        }
+const stringPlugin = definePlugin({
+  dataType: "string",
+  prepare: {
+    coerce: (value, [enabled]) => {
+      if (enabled === false) {
+        return value;
       }
+      if (typeof value === "string") {
+        return value;
+      }
+      if (value === null || value === void 0 || typeof value === "object" && !value.toString) {
+        return value;
+      }
+      return String(value);
+    },
+    trim: (value, [enabled]) => {
+      if (enabled === false) {
+        return value;
+      }
+      return typeof value === "string" ? value.trim() : value;
+    },
+    toLowerCase: (value, [enabled]) => {
+      if (enabled === false) {
+        return value;
+      }
+      return typeof value === "string" ? value.toLowerCase() : value;
     }
-  ]
-};
+  },
+  transform: {
+    toUpperCase: (value) => value.toUpperCase(),
+    toLowerCase: (value) => value.toLowerCase(),
+    trim: (value) => value.trim()
+  },
+  validate: {
+    identity: {
+      validator: (value) => typeof value === "string",
+      message: (ctx) => `Invalid type. Expected ${ctx.dataType}, received ${typeof ctx.value}.`
+    },
+    length: {
+      validator: (value, [length]) => value.length === length,
+      message: (ctx) => `${ctx.label} must be exactly ${ctx.args[0]} characters long.`
+    },
+    minLength: {
+      validator: (value, [minLength]) => value.length >= minLength,
+      message: (ctx) => `${ctx.label} must be at least ${ctx.args[0]} characters long.`
+    },
+    maxLength: {
+      validator: (value, [maxLength]) => value.length <= maxLength,
+      message: (ctx) => `${ctx.label} must be at most ${ctx.args[0]} characters long.`
+    },
+    range: {
+      validator: (value, [[min, max]]) => value.length >= min && value.length <= max,
+      message: (ctx) => `${ctx.label} must be between ${ctx.args[0][0]} and ${ctx.args[0][1]} characters long.`
+    },
+    exclusiveRange: {
+      validator: (value, [[min, max]]) => value.length > min && value.length < max,
+      message: (ctx) => `${ctx.label} must be strictly between ${ctx.args[0][0]} and ${ctx.args[0][1]} characters long.`
+    },
+    pattern: {
+      validator: (value, [pattern]) => pattern.test(value),
+      message: (ctx) => `${ctx.label} does not match the required pattern.`
+    },
+    oneOf: {
+      validator: (value, [options]) => options.includes(value),
+      message: (ctx) => `${ctx.label} must be one of the following values: ${ctx.args[0].join(
+        ", "
+      )}`
+    },
+    cuid: {
+      validator: (value, [enabled]) => {
+        if (enabled === void 0) return true;
+        return enabled ? regex.cuid.test(value) : !regex.cuid.test(value);
+      },
+      message: (ctx) => `${ctx.label} must be a valid CUID.`
+    },
+    cuid2: {
+      validator: (value, [enabled]) => {
+        if (enabled === void 0) return true;
+        return enabled ? regex.cuid2.test(value) : !regex.cuid2.test(value);
+      },
+      message: (ctx) => `${ctx.label} must be a valid CUID2.`
+    },
+    ulid: {
+      validator: (value, [enabled = true]) => {
+        return enabled ? regex.ulid.test(value) : !regex.ulid.test(value);
+      },
+      message: (ctx) => `${ctx.label} must be a valid ULID.`
+    },
+    emoji: {
+      validator: (value, [enabled]) => {
+        if (enabled === void 0) return true;
+        return enabled ? regex.emoji.test(value) : !regex.emoji.test(value);
+      },
+      message: (ctx) => `${ctx.label} must be a valid emoji.`
+    },
+    ipv4: {
+      validator: (value, [enabled]) => {
+        if (enabled === void 0) return true;
+        return enabled ? regex.ipv4.test(value) : !regex.ipv4.test(value);
+      },
+      message: (ctx) => `${ctx.label} must be a valid IPv4 address.`
+    },
+    ipv4Cidr: {
+      validator: (value, [enabled]) => {
+        if (enabled === void 0) return true;
+        return enabled ? regex.cidrv4.test(value) : !regex.cidrv4.test(value);
+      },
+      message: (ctx) => `${ctx.label} must be a valid IPv4 CIDR.`
+    },
+    ipv6: {
+      validator: (value, [enabled]) => {
+        if (enabled === void 0) return true;
+        return enabled ? regex.ipv6.test(value) : !regex.ipv6.test(value);
+      },
+      message: (ctx) => `${ctx.label} must be a valid IPv6 address.`
+    },
+    ipv6Cidr: {
+      validator: (value, [enabled]) => {
+        if (enabled === void 0) return true;
+        return enabled ? regex.cidrv6.test(value) : !regex.cidrv6.test(value);
+      },
+      message: (ctx) => `${ctx.label} must be a valid IPv6 CIDR.`
+    },
+    base64: {
+      validator: (value, [enabled]) => {
+        if (enabled === void 0) return true;
+        return enabled ? regex.base64.test(value) : !regex.base64.test(value);
+      },
+      message: (ctx) => `${ctx.label} must be a valid base64 string.`
+    },
+    base64Url: {
+      validator: (value, [enabled]) => {
+        if (enabled === void 0) return true;
+        return enabled ? regex.base64url.test(value) : !regex.base64url.test(value);
+      },
+      message: (ctx) => `${ctx.label} must be a valid base64url string.`
+    },
+    date: {
+      validator: (value, [enabled]) => {
+        if (enabled === void 0) return true;
+        return enabled ? regex.isoDate.test(value) : !regex.isoDate.test(value);
+      },
+      message: (ctx) => `${ctx.label} must be a valid date string.`
+    },
+    time: {
+      validator: (value, [enabled]) => {
+        if (enabled === void 0) return true;
+        return enabled ? regex.isoTime.test(value) : !regex.isoTime.test(value);
+      },
+      message: (ctx) => `${ctx.label} must be a valid time string.`
+    },
+    duration: {
+      validator: (value, [enabled]) => {
+        if (enabled === void 0) return true;
+        return enabled ? regex.isoDuration.test(value) : !regex.isoDuration.test(value);
+      },
+      message: (ctx) => `${ctx.label} must be a valid duration string.`
+    },
+    hexColor: {
+      validator: (value, [enabled]) => {
+        if (enabled === void 0) return true;
+        return enabled ? regex.hexColor.test(value) : !regex.hexColor.test(value);
+      },
+      message: (ctx) => `${ctx.label} must be a valid hex color.`
+    },
+    semver: {
+      validator: (value, [enabled]) => {
+        if (enabled === void 0) return true;
+        return enabled ? regex.semver.test(value) : !regex.semver.test(value);
+      },
+      message: (ctx) => `${ctx.label} must be a valid semver string.`
+    },
+    url: {
+      validator: (value, [enabled = true]) => {
+        return enabled ? regex.url.test(value) : !regex.url.test(value);
+      },
+      message: (ctx) => `${ctx.label} must be a valid URL.`
+    },
+    uuid: {
+      validator: (value, [enabled]) => {
+        if (enabled === void 0) return true;
+        return enabled ? regex.uuid.test(value) : !regex.uuid.test(value);
+      },
+      message: (ctx) => `${ctx.label} must be a valid UUID.`
+    },
+    uuidV7: {
+      validator: (value, [enabled = true]) => {
+        return enabled ? regex.uuidV7.test(value) : !regex.uuidV7.test(value);
+      },
+      message: (ctx) => `${ctx.label} must be a valid UUIDv7.`
+    },
+    datetime: {
+      validator: (value, [enabled]) => {
+        if (enabled === void 0) return true;
+        return enabled ? regex.isoDateTime.test(value) : !regex.isoDateTime.test(value);
+      },
+      message: (ctx) => `${ctx.label} must be a valid datetime string.`
+    },
+    json: {
+      validator: async (value, [schema]) => {
+        let parsed;
+        try {
+          parsed = JSON.parse(value);
+        } catch (e) {
+          return false;
+        }
+        if (schema) {
+          const result = await schema.safeParse(parsed);
+          return result.status === "success";
+        }
+        return true;
+      },
+      message: (ctx) => {
+        if (ctx.args[0]) {
+          return `${ctx.label} must be a JSON string that conforms to the provided schema.`;
+        }
+        return `${ctx.label} must be a valid JSON string.`;
+      }
+    },
+    email: {
+      validator: (value, [config]) => {
+        if (config === void 0) {
+          return true;
+        }
+        if (typeof config === "object") {
+          if (!regex.email.test(value)) {
+            return false;
+          }
+          const domain = value.substring(value.lastIndexOf("@") + 1);
+          if (config.denied) {
+            for (const rule of config.denied) {
+              if (rule instanceof RegExp ? rule.test(domain) : rule === domain) {
+                return false;
+              }
+            }
+          }
+          if (config.allowed) {
+            for (const rule of config.allowed) {
+              if (rule instanceof RegExp ? rule.test(domain) : rule === domain) {
+                return true;
+              }
+            }
+            return false;
+          }
+          return true;
+        }
+        return config ? regex.email.test(value) : !regex.email.test(value);
+      },
+      message: (ctx) => `${ctx.label} must be a valid email address.`
+    }
+  }
+});
 
-const unknownPlugin = {
-  unknown: [
-    {
-      validate: {
-        identity: {
-          validator: (value) => true,
-          message: (ctx) => "Invalid value."
-        }
-      }
+const unknownPlugin = definePlugin({
+  dataType: "unknown",
+  validate: {
+    identity: {
+      validator: (value) => true,
+      message: (ctx) => "Invalid value."
     }
-  ]
-};
+  }
+});
+
+const literalPlugin = definePlugin({
+  dataType: "literal",
+  validate: {
+    identity: {
+      validator: (value, [literal]) => {
+        return value === literal;
+      },
+      message: (ctx) => `Invalid literal value. Expected ${JSON.stringify(
+        ctx.args[0]
+      )}, received ${JSON.stringify(ctx.value)}`
+    }
+  }
+});
+
+const unionPlugin = definePlugin({
+  dataType: "union",
+  validate: {
+    identity: {
+      validator: async (value, [schemas], context) => {
+        if (!schemas) return false;
+        const issues = [];
+        for (const schema of schemas) {
+          try {
+            await schema.parse(value, context);
+            return true;
+          } catch (e) {
+            if (e instanceof ValidationError) {
+              issues.push(...e.issues);
+            } else {
+              throw e;
+            }
+          }
+        }
+        throw new ValidationError(issues);
+      },
+      message: (ctx) => `No union variant matched the provided value.`
+    }
+  }
+});
+
+const recordPlugin = definePlugin({
+  dataType: "record",
+  validate: {
+    identity: {
+      validator: async (value, [keySchema, valueSchema], context) => {
+        if (typeof value !== "object" || value === null || Array.isArray(value)) {
+          return false;
+        }
+        if (!keySchema || !valueSchema) return false;
+        const issues = [];
+        for (const [key, val] of Object.entries(value)) {
+          try {
+            await keySchema.parse(key, context);
+            await valueSchema.parse(val, context);
+          } catch (e) {
+            if (e instanceof ValidationError) {
+              issues.push(e);
+            } else {
+              throw e;
+            }
+          }
+        }
+        if (issues.length > 0) {
+          throw new ValidationError(issues.flatMap((e) => e.issues));
+        }
+        return true;
+      },
+      message: (ctx) => `Invalid type. Expected a record object, received ${typeof ctx.value}.`
+    }
+  }
+});
+
+const switchPlugin = definePlugin({
+  dataType: "switch",
+  validate: {
+    identity: {
+      validator: async (value, args, context, schema) => {
+        const {
+          select,
+          cases,
+          default: defaultSchema
+        } = schema.config;
+        if (!select || !cases) {
+          return true;
+        }
+        const key = select(context);
+        const caseSchema = cases[key] || defaultSchema;
+        if (caseSchema) {
+          const result = await caseSchema.safeParse(value, context);
+          if (result.status === "error") {
+            throw result.error;
+          }
+        }
+        return true;
+      },
+      message: (ctx) => `Switch validation failed.`
+    }
+  }
+});
 
 const plugins = [
   anyPlugin,
@@ -714,13 +863,17 @@ const plugins = [
   booleanPlugin,
   datePlugin,
   instanceofPlugin,
+  literalPlugin,
   mapPlugin,
   nanPlugin,
   neverPlugin,
   numberPlugin,
   objectPlugin,
+  recordPlugin,
   setPlugin,
   stringPlugin,
+  switchPlugin,
+  unionPlugin,
   unknownPlugin
 ];
 const validatorMap = {};
@@ -728,43 +881,29 @@ const preparationMap = {};
 const transformationMap = {};
 const messageMap = {};
 for (const plugin of plugins) {
-  for (const dataType in plugin) {
-    if (!Object.prototype.hasOwnProperty.call(plugin, dataType)) continue;
-    validatorMap[dataType] = validatorMap[dataType] || {
-      identity: (value) => false
-    };
-    preparationMap[dataType] = preparationMap[dataType] || {};
-    transformationMap[dataType] = transformationMap[dataType] || {};
-    messageMap[dataType] = messageMap[dataType] || {};
-    const definitions = plugin[dataType];
-    for (const def of definitions) {
-      if (def.prepare) {
-        for (const name in def.prepare) {
-          preparationMap[dataType][name] = def.prepare[name];
-        }
-      }
-      if (def.validate) {
-        for (const name in def.validate) {
-          const validatorDef = def.validate[name];
-          validatorMap[dataType][name] = validatorDef.validator;
-          messageMap[dataType][name] = validatorDef.message;
-        }
-      }
-      if (def.transform) {
-        for (const name in def.transform) {
-          transformationMap[dataType][name] = def.transform[name];
-        }
-      }
+  const dataType = plugin.dataType;
+  validatorMap[dataType] = validatorMap[dataType] || {
+    identity: (value) => false
+  };
+  preparationMap[dataType] = preparationMap[dataType] || {};
+  transformationMap[dataType] = transformationMap[dataType] || {};
+  messageMap[dataType] = messageMap[dataType] || {};
+  if (plugin.prepare) {
+    for (const name in plugin.prepare) {
+      preparationMap[dataType][name] = plugin.prepare[name];
     }
   }
-}
-
-class ValidationError extends Error {
-  issues;
-  constructor(issues) {
-    super(issues[0]?.message || "Validation failed");
-    this.issues = issues;
-    this.name = "ValidationError";
+  if (plugin.validate) {
+    for (const name in plugin.validate) {
+      const validatorDef = plugin.validate[name];
+      validatorMap[dataType][name] = validatorDef.validator;
+      messageMap[dataType][name] = validatorDef.message;
+    }
+  }
+  if (plugin.transform) {
+    for (const name in plugin.transform) {
+      transformationMap[dataType][name] = plugin.transform[name];
+    }
   }
 }
 
@@ -779,7 +918,7 @@ class Schema {
   config;
   label;
   "~standard";
-  constructor(dataType, config = {}, validatorMap2, preparationMap2, transformationMap2) {
+  constructor(dataType, config = {}) {
     this.dataType = dataType;
     this.config = config;
     const {
@@ -790,9 +929,9 @@ class Schema {
       ...rest
     } = config;
     this.label = config.label || this.dataType.charAt(0).toUpperCase() + this.dataType.slice(1);
-    const validatorCollection = validatorMap2[dataType];
-    const preparationCollection = preparationMap2[dataType];
-    const transformationCollection = transformationMap2[dataType];
+    const validatorCollection = validatorMap[dataType];
+    const preparationCollection = preparationMap[dataType];
+    const transformationCollection = transformationMap[dataType];
     if (validatorCollection?.identity) {
       this.validators.push({
         name: "identity",
@@ -1012,880 +1151,28 @@ class Schema {
     }
   }
   optional() {
-    return new Schema(
-      this.dataType,
-      { ...this.config, optional: true },
-      validatorMap,
-      preparationMap,
-      transformationMap
-    );
+    return new Schema(this.dataType, { ...this.config, optional: true });
   }
   nullable() {
-    return new Schema(
-      this.dataType,
-      { ...this.config, nullable: true },
-      validatorMap,
-      preparationMap,
-      transformationMap
-    );
+    return new Schema(this.dataType, { ...this.config, nullable: true });
   }
   asKey() {
     return this;
   }
 }
-class ObjectSchema extends Schema {
-  constructor(config) {
-    super(
-      "object",
-      config,
-      validatorMap,
-      preparationMap,
-      transformationMap
-    );
-  }
-  async _prepare(context) {
-    let preparedObject = await super._prepare(context);
-    if (preparedObject === void 0 || preparedObject === null) {
-      return preparedObject;
-    }
-    const properties = this.config.properties;
-    const newObject = { ...preparedObject };
-    for (const key in properties) {
-      if (Object.prototype.hasOwnProperty.call(newObject, key)) {
-        const schema = properties[key];
-        const value = newObject[key];
-        const childContext = {
-          ...context,
-          path: [...context.path, key],
-          value
-        };
-        newObject[key] = await schema._prepare(childContext);
-      }
-    }
-    return newObject;
-  }
-  async _validate(value, context) {
-    await super._validate(value, context);
-    const properties = this.config.properties;
-    const isStrict = this.config.strict;
-    const issues = [];
-    const allKeys = /* @__PURE__ */ new Set([
-      ...Object.keys(value),
-      ...Object.keys(properties)
-    ]);
-    for (const key of allKeys) {
-      const schema = properties[key];
-      const propertyValue = value[key];
-      const childContext = {
-        ...context,
-        path: [...context.path, key],
-        value: propertyValue
-      };
-      if (schema) {
-        try {
-          const result = await schema._validate(propertyValue, childContext);
-          console.log("result", result);
-        } catch (e) {
-          if (e instanceof ValidationError) issues.push(...e.issues);
-          else throw e;
-        }
-      } else if (isStrict && Object.prototype.hasOwnProperty.call(value, key)) {
-        issues.push({
-          path: childContext.path,
-          message: `Unrecognized key: '${key}'`
-        });
-      }
-    }
-    for (const customValidator of this.customValidators) {
-      const result = typeof customValidator === "function" ? await customValidator(value, { ...context, value }) : await customValidator.validator(value, { ...context, value });
-      if (!result) {
-        const message = typeof customValidator === "object" ? customValidator.message : "Custom validation failed";
-        issues.push({
-          path: context.path,
-          message: message || "Custom validation failed for object"
-        });
-      }
-    }
-    if (issues.length > 0) throw new ValidationError(issues);
-  }
-  async _transform(value, context) {
-    if (value === void 0 || value === null) return value;
-    const properties = this.config.properties;
-    const transformedObject = { ...value };
-    for (const key in properties) {
-      if (Object.prototype.hasOwnProperty.call(transformedObject, key)) {
-        const schema = properties[key];
-        const propertyValue = transformedObject[key];
-        const childContext = {
-          ...context,
-          path: [...context.path, key],
-          value: propertyValue
-        };
-        transformedObject[key] = await schema._transform(
-          propertyValue,
-          childContext
-        );
-      }
-    }
-    return await super._transform(transformedObject, {
-      ...context,
-      value: transformedObject
-    });
-  }
-  partial() {
-    const originalProperties = this.config.properties;
-    const newProperties = {};
-    for (const key in originalProperties) {
-      newProperties[key] = originalProperties[key].optional();
-    }
-    const newConfig = {
-      ...this.config,
-      properties: newProperties
-    };
-    return new ObjectSchema(newConfig);
-  }
-  pick(keys) {
-    const originalProperties = this.config.properties;
-    const newProperties = {};
-    for (const key of keys) {
-      if (key in originalProperties) {
-        newProperties[key] = originalProperties[key];
-      }
-    }
-    const newConfig = {
-      ...this.config,
-      properties: newProperties,
-      strict: true
-    };
-    return new ObjectSchema(newConfig);
-  }
-  omit(keys) {
-    const originalProperties = this.config.properties;
-    const newProperties = { ...originalProperties };
-    for (const key of keys) {
-      delete newProperties[key];
-    }
-    const newConfig = {
-      ...this.config,
-      properties: newProperties,
-      strict: true
-    };
-    return new ObjectSchema(newConfig);
-  }
-  extend(extension) {
-    const originalProperties = this.config.properties;
-    const newConfig = {
-      ...this.config,
-      properties: {
-        ...originalProperties,
-        ...extension
-      },
-      strict: false
-    };
-    return new ObjectSchema(newConfig);
-  }
-  strict() {
-    const newConfig = {
-      ...this.config,
-      strict: true,
-      properties: this.config.properties
-    };
-    return new ObjectSchema(newConfig);
-  }
-  optional() {
-    return new ObjectSchema({ ...this.config, optional: true });
-  }
-  nullable() {
-    return new ObjectSchema({ ...this.config, nullable: true });
-  }
-}
-class ArraySchema extends Schema {
-  itemSchema;
-  tupleSchemas;
-  constructor(config) {
-    super(
-      "array",
-      config,
-      validatorMap,
-      preparationMap,
-      transformationMap
-    );
-    const { validate } = config;
-    if (!validate || !validate.ofType) {
-      throw new Error(
-        "s.array() requires an 'ofType' validator configuration."
-      );
-    }
-    this.itemSchema = validate.ofType;
-    if (validate.items) {
-      this.tupleSchemas = validate.items;
-    }
-  }
-  async _prepare(context) {
-    let preparedValue = await super._prepare(context);
-    if (preparedValue === void 0 || preparedValue === null || !Array.isArray(preparedValue)) {
-      return preparedValue;
-    }
-    const preparedArray = [];
-    for (let i = 0; i < preparedValue.length; i++) {
-      const item = preparedValue[i];
-      const childContext = {
-        ...context,
-        value: item,
-        path: [...context.path, i]
-      };
-      preparedArray.push(await this.itemSchema._prepare(childContext));
-    }
-    return preparedArray;
-  }
-  async _validate(value, context) {
-    await super._validate(value, context);
-    if (value === void 0 || value === null) return;
-    if (!Array.isArray(value)) {
-      throw new ValidationError([
-        {
-          path: context.path,
-          message: `Invalid type. Expected array, received ${typeof value}.`
-        }
-      ]);
-    }
-    const issues = [];
-    if (this.tupleSchemas) {
-      if (value.length !== this.tupleSchemas.length) {
-        issues.push({
-          path: context.path,
-          message: `Expected a tuple of length ${this.tupleSchemas.length}, but received ${value.length}.`
-        });
-      } else {
-        for (let i = 0; i < this.tupleSchemas.length; i++) {
-          const itemSchema = this.tupleSchemas[i];
-          const item = value[i];
-          const childContext = {
-            ...context,
-            value: item,
-            path: [...context.path, i]
-          };
-          try {
-            await itemSchema._validate(item, childContext);
-          } catch (error) {
-            if (error instanceof ValidationError) {
-              issues.push(...error.issues);
-            } else {
-              throw error;
-            }
-          }
-        }
-      }
-    } else {
-      for (let i = 0; i < value.length; i++) {
-        const item = value[i];
-        const childContext = {
-          ...context,
-          value: item,
-          path: [...context.path, i]
-        };
-        try {
-          await this.itemSchema._validate(item, childContext);
-        } catch (e) {
-          if (e instanceof ValidationError) {
-            issues.push(...e.issues);
-          } else {
-            throw e;
-          }
-        }
-      }
-    }
-    for (const { name, validator, args } of this.validators) {
-      if (name === "identity" || name === "ofType" || name === "items")
-        continue;
-      const result = await validator(
-        value,
-        args,
-        { ...context, value },
-        this
-      );
-      if (!result) {
-        const messages = this.config.messages;
-        let message = messages?.[name];
-        if (!message) {
-          message = `Validation failed for array.${name}`;
-        }
-        issues.push({ path: context.path, message });
-      }
-    }
-    if (issues.length > 0) {
-      throw new ValidationError(issues);
-    }
-  }
-  async _transform(value, context) {
-    if (value === void 0 || value === null || !Array.isArray(value)) {
-      return value;
-    }
-    const transformedArray = [];
-    if (this.tupleSchemas) {
-      for (let i = 0; i < value.length; i++) {
-        const itemSchema = this.tupleSchemas[i] ?? this.itemSchema;
-        const item = value[i];
-        const childContext = {
-          ...context,
-          value: item,
-          path: [...context.path, i]
-        };
-        transformedArray.push(await itemSchema._transform(item, childContext));
-      }
-    } else {
-      for (let i = 0; i < value.length; i++) {
-        const item = value[i];
-        const childContext = {
-          ...context,
-          value: item,
-          path: [...context.path, i]
-        };
-        transformedArray.push(
-          await this.itemSchema._transform(item, childContext)
-        );
-      }
-    }
-    return await super._transform(transformedArray, {
-      ...context,
-      value: transformedArray
-    });
-  }
-  optional() {
-    return new ArraySchema({ ...this.config, optional: true });
-  }
-  nullable() {
-    return new ArraySchema({ ...this.config, nullable: true });
-  }
-}
-class RecordSchema extends Schema {
-  keySchema;
-  valueSchema;
-  constructor(keySchema, valueSchema, config = {}) {
-    super(
-      "record",
-      config,
-      validatorMap,
-      preparationMap,
-      transformationMap
-    );
-    this.keySchema = keySchema;
-    this.valueSchema = valueSchema;
-  }
-  async _prepare(context) {
-    const value = await super._prepare(context);
-    if (typeof value !== "object" || value === null || Array.isArray(value)) {
-      return value;
-    }
-    const preparedRecord = {};
-    for (const [key, val] of Object.entries(value)) {
-      preparedRecord[key] = await this.valueSchema._prepare({
-        ...context,
-        value: val,
-        path: [...context.path, key]
-      });
-    }
-    return preparedRecord;
-  }
-  async _validate(value, context) {
-    await super._validate(value, context);
-    if (typeof value !== "object" || Array.isArray(value)) {
-      throw new ValidationError([
-        { path: context.path, message: "Input must be a record-like object." }
-      ]);
-    }
-    const issues = [];
-    for (const [key, val] of Object.entries(value)) {
-      const keyContext = {
-        ...context,
-        value: key,
-        path: [...context.path, key]
-      };
-      try {
-        const preparedKey = await this.keySchema._prepare(keyContext);
-        await this.keySchema._validate(preparedKey, {
-          ...keyContext,
-          value: preparedKey
-        });
-      } catch (e) {
-        if (e instanceof ValidationError) {
-          issues.push(
-            ...e.issues.map((issue) => ({
-              ...issue,
-              message: `Invalid key: ${issue.message}`
-            }))
-          );
-        } else {
-          throw e;
-        }
-      }
-      const valueContext = {
-        ...context,
-        value: val,
-        path: [...context.path, key]
-      };
-      try {
-        await this.valueSchema._validate(val, valueContext);
-      } catch (e) {
-        if (e instanceof ValidationError) {
-          issues.push(...e.issues);
-        } else {
-          throw e;
-        }
-      }
-    }
-    if (issues.length > 0) {
-      throw new ValidationError(issues);
-    }
-  }
-  async _transform(value, context) {
-    if (typeof value !== "object" || value === null || Array.isArray(value)) {
-      return value;
-    }
-    const finalRecord = {};
-    for (const [key, val] of Object.entries(value)) {
-      const valueContext = {
-        ...context,
-        value: val,
-        path: [...context.path, key]
-      };
-      const transformedKey = await this.keySchema.parse(key);
-      const transformedValue = await this.valueSchema._transform(
-        val,
-        valueContext
-      );
-      finalRecord[transformedKey] = transformedValue;
-    }
-    return super._transform(finalRecord, {
-      ...context,
-      value: finalRecord
-    });
-  }
-  optional() {
-    return new RecordSchema(this.keySchema, this.valueSchema, {
-      ...this.config,
-      optional: true
-    });
-  }
-  nullable() {
-    return new RecordSchema(this.keySchema, this.valueSchema, {
-      ...this.config,
-      nullable: true
-    });
-  }
-}
-class SwitchSchema extends Schema {
-  keyFn;
-  schemas;
-  defaultSchema;
-  constructor(keyFn, schemas, defaultSchema) {
-    super(
-      "switch",
-      {},
-      validatorMap,
-      preparationMap,
-      transformationMap
-    );
-    this.keyFn = keyFn;
-    this.schemas = schemas;
-    this.defaultSchema = defaultSchema;
-  }
-  getSchema(context) {
-    const key = this.keyFn(context);
-    return this.schemas[key] || this.defaultSchema;
-  }
-  async _prepare(context) {
-    const schema = this.getSchema(context);
-    if (schema) {
-      return schema._prepare(context);
-    }
-    return context.value;
-  }
-  async _validate(value, context) {
-    const childContext = { ...context, value };
-    const schema = this.getSchema(childContext);
-    if (schema) {
-      return schema._validate(value, childContext);
-    }
-  }
-  async _transform(value, context) {
-    const childContext = { ...context, value };
-    const schema = this.getSchema(childContext);
-    if (schema) {
-      return schema._transform(value, childContext);
-    }
-    return value;
-  }
-}
-class MapSchema extends Schema {
-  keySchema;
-  valueSchema;
-  constructor(keySchema, valueSchema) {
-    super(
-      "map",
-      {},
-      validatorMap,
-      preparationMap,
-      transformationMap
-    );
-    this.keySchema = keySchema;
-    this.valueSchema = valueSchema;
-  }
-  async _prepare(context) {
-    const value = await super._prepare(context);
-    if (!(value instanceof Map)) {
-      return value;
-    }
-    const preparedMap = /* @__PURE__ */ new Map();
-    for (const [key, val] of value.entries()) {
-      preparedMap.set(
-        key,
-        await this.valueSchema._prepare({
-          ...context,
-          value: val,
-          path: [...context.path, key, "value"]
-        })
-      );
-    }
-    return preparedMap;
-  }
-  async _validate(value, context) {
-    await super._validate(value, context);
-    if (value === void 0 || value === null) return;
-    if (!(value instanceof Map)) {
-      throw new ValidationError([
-        { path: context.path, message: "Invalid type. Expected a Map." }
-      ]);
-    }
-    const issues = [];
-    for (const [key, val] of value.entries()) {
-      const keyContext = {
-        ...context,
-        value: key,
-        path: [...context.path, key, "key"]
-      };
-      try {
-        const preparedKey = await this.keySchema._prepare(keyContext);
-        await this.keySchema._validate(preparedKey, {
-          ...keyContext,
-          value: preparedKey
-        });
-      } catch (e) {
-        if (e instanceof ValidationError) {
-          issues.push(
-            ...e.issues.map((issue) => ({
-              ...issue,
-              message: `Invalid key: ${issue.message}`
-            }))
-          );
-        } else {
-          throw e;
-        }
-      }
-      const valueContext = {
-        ...context,
-        value: val,
-        path: [...context.path, key, "value"]
-      };
-      try {
-        await this.valueSchema._validate(val, valueContext);
-      } catch (e) {
-        if (e instanceof ValidationError) {
-          issues.push(...e.issues);
-        } else {
-          throw e;
-        }
-      }
-    }
-    if (issues.length > 0) {
-      throw new ValidationError(issues);
-    }
-  }
-  async _transform(value, context) {
-    if (!(value instanceof Map)) {
-      return value;
-    }
-    const newMap = /* @__PURE__ */ new Map();
-    for (const [key, val] of value.entries()) {
-      const valueContext = {
-        ...context,
-        value: val,
-        path: [...context.path, key, "value"]
-      };
-      const transformedKey = await this.keySchema.parse(key);
-      const transformedValue = await this.valueSchema._transform(
-        val,
-        valueContext
-      );
-      newMap.set(transformedKey, transformedValue);
-    }
-    return super._transform(newMap, { ...context, value: newMap });
-  }
-  optional() {
-    return new MapSchema(this.keySchema, this.valueSchema);
-  }
-  nullable() {
-    return new MapSchema(this.keySchema, this.valueSchema);
-  }
-}
-class SetSchema extends Schema {
-  valueSchema;
-  constructor(valueSchema) {
-    super(
-      "set",
-      {},
-      validatorMap,
-      preparationMap,
-      transformationMap
-    );
-    this.valueSchema = valueSchema;
-  }
-  async _prepare(context) {
-    const value = await super._prepare(context);
-    if (!(value instanceof Set)) {
-      return value;
-    }
-    const preparedSet = /* @__PURE__ */ new Set();
-    for (const val of value.values()) {
-      preparedSet.add(
-        await this.valueSchema._prepare({
-          ...context,
-          value: val,
-          path: [...context.path, val]
-        })
-      );
-    }
-    return preparedSet;
-  }
-  async _validate(value, context) {
-    await super._validate(value, context);
-    if (value === void 0 || value === null) return;
-    if (!(value instanceof Set)) {
-      throw new ValidationError([
-        { path: context.path, message: "Invalid type. Expected a Set." }
-      ]);
-    }
-    const issues = [];
-    for (const val of value.values()) {
-      const valueContext = {
-        ...context,
-        value: val,
-        path: [...context.path, val]
-      };
-      try {
-        await this.valueSchema._validate(val, valueContext);
-      } catch (e) {
-        if (e instanceof ValidationError) {
-          issues.push(...e.issues);
-        } else {
-          throw e;
-        }
-      }
-    }
-    if (issues.length > 0) {
-      throw new ValidationError(issues);
-    }
-  }
-  async _transform(value, context) {
-    if (!(value instanceof Set)) {
-      return value;
-    }
-    const newSet = /* @__PURE__ */ new Set();
-    for (const val of value.values()) {
-      const valueContext = {
-        ...context,
-        value: val,
-        path: [...context.path, val]
-      };
-      newSet.add(await this.valueSchema._transform(val, valueContext));
-    }
-    return super._transform(newSet, { ...context, value: newSet });
-  }
-  optional() {
-    return new SetSchema(this.valueSchema);
-  }
-  nullable() {
-    return new SetSchema(this.valueSchema);
-  }
-}
-class InstanceOfSchema extends Schema {
-  constructorFn;
-  constructor(constructorFn) {
-    super(
-      "instanceof",
-      {},
-      validatorMap,
-      preparationMap,
-      transformationMap
-    );
-    this.constructorFn = constructorFn;
-  }
-  async _validate(value, context) {
-    await super._validate(value, context);
-  }
-  optional() {
-    return new InstanceOfSchema(this.constructorFn);
-  }
-  nullable() {
-    return new InstanceOfSchema(this.constructorFn);
-  }
-}
-class UnknownSchema extends Schema {
-  constructor(config = {}) {
-    super(
-      "unknown",
-      config,
-      validatorMap,
-      preparationMap,
-      transformationMap
-    );
-  }
-}
-class NeverSchema extends Schema {
-  constructor() {
-    super(
-      "never",
-      {},
-      validatorMap,
-      preparationMap,
-      transformationMap
-    );
-  }
-}
-class LiteralSchema extends Schema {
-  literal;
-  constructor(literal) {
-    super(
-      "literal",
-      {},
-      validatorMap,
-      preparationMap,
-      transformationMap
-    );
-    this.literal = literal;
-  }
-  async _validate(value, context) {
-    await super._validate(value, context);
-    if (this.config.optional && value === void 0) return;
-    if (this.config.nullable && value === null) {
-      if (this.literal === null) return;
-    }
-    if (value !== this.literal) {
-      throw new ValidationError([
-        {
-          path: context.path,
-          message: `Invalid literal value. Expected ${JSON.stringify(
-            this.literal
-          )}, received ${JSON.stringify(value)}`
-        }
-      ]);
-    }
-  }
-  optional() {
-    return new LiteralSchema(this.literal);
-  }
-  nullable() {
-    return new LiteralSchema(this.literal);
-  }
-}
-class UnionSchema extends Schema {
-  schemas;
-  constructor(schemas) {
-    super(
-      "union",
-      {},
-      validatorMap,
-      preparationMap,
-      transformationMap
-    );
-    this.schemas = schemas;
-  }
-  async _validate(value, context) {
-    const issues = [];
-    for (const schema of this.schemas) {
-      try {
-        await schema._validate(value, context);
-        return;
-      } catch (e) {
-        if (e instanceof ValidationError) {
-          issues.push(...e.issues);
-        } else {
-          throw e;
-        }
-      }
-    }
-    throw new ValidationError(issues);
-  }
-  async _transform(value, context) {
-    for (const schema of this.schemas) {
-      try {
-        await schema._validate(value, context);
-        return schema._transform(value, context);
-      } catch (e) {
-        if (!(e instanceof ValidationError)) {
-          throw e;
-        }
-      }
-    }
-    return value;
-  }
-  optional() {
-    ({ ...this.config});
-    const newUnion = new UnionSchema(this.schemas);
-    newUnion.config.optional = true;
-    return newUnion;
-  }
-  nullable() {
-    ({ ...this.config});
-    const newUnion = new UnionSchema(this.schemas);
-    newUnion.config.nullable = true;
-    return newUnion;
-  }
-}
-function createSchemaFunction(dataType, validatorMap2) {
-  return function(config) {
-    return new Schema(
-      dataType,
-      config || {},
-      validatorMap2,
-      preparationMap,
-      transformationMap
-    );
-  };
-}
-function createSchemaBuilder(validatorMap2, preparationMap2, transformationMap2) {
+function createSchemaBuilder() {
   const builder = {};
-  for (const key in validatorMap2) {
-    if (key === "object" || key === "array" || key === "unknown" || key === "never")
-      continue;
-    builder[key] = createSchemaFunction(key, validatorMap2);
+  for (const plugin of plugins) {
+    if (plugin.dataType === "switch") continue;
+    builder[plugin.dataType] = (config) => {
+      return new Schema(plugin.dataType, config);
+    };
   }
-  builder.object = (config) => new ObjectSchema(config);
-  builder.array = (config) => new ArraySchema(config);
-  builder.record = (keySchema, valueSchema, config) => new RecordSchema(keySchema, valueSchema, config);
-  builder.switch = (keyFn, schemas, defaultSchema) => {
-    return new SwitchSchema(keyFn, schemas, defaultSchema);
+  builder.switch = (config) => {
+    return new Schema("switch", config);
   };
-  builder.union = (schemas) => {
-    return new UnionSchema(schemas);
-  };
-  builder.literal = (literal) => {
-    return new LiteralSchema(literal);
-  };
-  builder.map = (keySchema, valueSchema) => {
-    return new MapSchema(keySchema, valueSchema);
-  };
-  builder.set = (valueSchema) => {
-    return new SetSchema(valueSchema);
-  };
-  builder.instanceof = (constructorFn) => {
-    return new InstanceOfSchema(constructorFn);
-  };
-  builder.unknown = (config) => new UnknownSchema(config);
-  builder.never = () => new NeverSchema();
   return builder;
 }
-const s = createSchemaBuilder(
-  validatorMap);
+const s = createSchemaBuilder();
 
-export { Schema, createSchemaBuilder, s };
+export { Schema, s };

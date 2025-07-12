@@ -1,2 +1,1 @@
-import { Plugin } from './types.js';
-export declare const anyPlugin: Plugin;
+export declare const anyPlugin: import('./types.js').Validator<any, unknown>;

@@ -1,2 +1,1 @@
-import { Plugin } from './types.js';
-export declare const arrayPlugin: Plugin;
+export declare const arrayPlugin: import('./types.js').Validator<any[], unknown>;

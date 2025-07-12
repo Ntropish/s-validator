@@ -54,9 +54,7 @@ describe("Record Validator", () => {
     const schema = s.record({ validate: { identity: [s.string(), s.any()] } });
     await expect(schema.parse(null)).rejects.toThrow();
     await expect(schema.parse(undefined)).rejects.toThrow();
-    // @ts-expect-error - An array is not a valid record input.
     await expect(schema.parse([])).rejects.toThrow();
-    // @ts-expect-error - A primitive is not a valid record input.
     await expect(schema.parse("a string")).rejects.toThrow();
   });
 
@@ -67,9 +65,11 @@ describe("Record Validator", () => {
 
   it("should handle complex nested records", async () => {
     const userSchema = s.object({
-      properties: {
-        name: s.string(),
-        email: s.string({ validate: { email: true } }),
+      validate: {
+        properties: {
+          name: s.string(),
+          email: s.string({ validate: { email: true } }),
+        },
       },
     });
     const schema = s.record({
@@ -92,9 +92,11 @@ describe("Record Validator", () => {
 
   it("should fail a nested record validation", async () => {
     const userSchema = s.object({
-      properties: {
-        name: s.string(),
-        email: s.string({ validate: { email: true } }),
+      validate: {
+        properties: {
+          name: s.string(),
+          email: s.string({ validate: { email: true } }),
+        },
       },
     });
     const schema = s.record({

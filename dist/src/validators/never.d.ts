@@ -1,2 +1,1 @@
-import { Plugin } from './types.js';
-export declare const neverPlugin: Plugin;
+export declare const neverPlugin: import('./types.js').Validator<never, unknown>;

@@ -4,9 +4,11 @@ import {
   preparationMap,
   transformationMap,
   messageMap,
+  plugins,
 } from "./validator-map.js";
 import { StandardSchemaV1 } from "./standard-schema.js";
 import {
+  Validator as SValidator,
   ValidatorFunction,
   ValidationContext,
   SchemaValidatorMap,
@@ -20,6 +22,7 @@ import {
   MessageProducer,
   MessageProducerContext,
 } from "./validators/types.js";
+import { SwitchConfig } from "./validators/switch.js";
 
 // A utility to force TS to expand a type in tooltips for better DX.
 type Prettify<T> = { [K in keyof T]: T[K] } & {};
@@ -35,15 +38,6 @@ type UndefinedToOptional<T> = Prettify<
     [K in UndefinedKeys<T>]?: T[K];
   }
 >;
-
-// Infers the argument type from a validator function's signature.
-type InferConfig<Func> = Func extends (
-  value: any,
-  args: [infer ConfigType],
-  ...rest: any[]
-) => any
-  ? ConfigType
-  : unknown;
 
 type CustomValidator<T> =
   | ((value: T, context: ValidationContext) => boolean | Promise<boolean>)
@@ -75,13 +69,6 @@ type ValidatorConfig<VCollection> = {
   };
   transform?: Record<string, any> & { custom?: ((value: any) => any)[] };
 };
-
-// Infers the base data type (e.g., string, number) from the identity validator.
-type InferDataType<VCollection> = VCollection extends {
-  identity: (value: any) => value is infer T;
-}
-  ? T
-  : unknown;
 
 type InferSchemaType<T extends Schema<any, any>> = T extends Schema<
   infer U,
@@ -131,13 +118,7 @@ export class Schema<TOutput, TInput = TOutput>
   public label: string;
   public readonly "~standard": StandardSchemaV1.Props<TInput, TOutput>;
 
-  constructor(
-    dataType: string,
-    config: Record<string, unknown> = {},
-    validatorMap: SchemaValidatorMap,
-    preparationMap: Record<string, any>,
-    transformationMap: Record<string, any>
-  ) {
+  constructor(dataType: string, config: Record<string, unknown> = {}) {
     this.dataType = dataType;
     this.config = config; // Keep original config for modifiers
 
@@ -417,23 +398,11 @@ export class Schema<TOutput, TInput = TOutput>
   }
 
   public optional(): Schema<TOutput | undefined, TInput | undefined> {
-    return new Schema(
-      this.dataType,
-      { ...this.config, optional: true },
-      validatorMap as any,
-      preparationMap as any,
-      transformationMap as any
-    );
+    return new Schema(this.dataType, { ...this.config, optional: true });
   }
 
   public nullable(): Schema<TOutput | null, TInput | null> {
-    return new Schema(
-      this.dataType,
-      { ...this.config, nullable: true },
-      validatorMap as any,
-      preparationMap as any,
-      transformationMap as any
-    );
+    return new Schema(this.dataType, { ...this.config, nullable: true });
   }
 
   public asKey(): Schema<string | number, TInput> {
@@ -447,13 +416,7 @@ class ObjectSchema<
   T = InferSObjectType<P>
 > extends Schema<T> {
   constructor(config: SObjectOptions<P>) {
-    super(
-      "object",
-      config,
-      validatorMap as any,
-      preparationMap as any,
-      transformationMap as any
-    );
+    super("object", config);
   }
 
   public async _prepare(context: ValidationContext): Promise<any> {
@@ -592,13 +555,7 @@ class ArraySchema<T extends Schema<any, any>> extends Schema<
   constructor(
     config: ValidatorConfig<any> & { validate: { ofType?: T; items?: any } }
   ) {
-    super(
-      "array",
-      config,
-      validatorMap as any,
-      preparationMap as any,
-      transformationMap as any
-    );
+    super("array", config);
     const { validate } = config as {
       validate?: { ofType?: T; items?: Schema<any, any>[] };
     };
@@ -801,13 +758,7 @@ class SwitchSchema<
     schemas: TCases,
     defaultSchema?: TDefault
   ) {
-    super(
-      "switch",
-      {},
-      validatorMap as any,
-      preparationMap as any,
-      transformationMap as any
-    );
+    super("switch", {});
     this.keyFn = keyFn;
     this.schemas = schemas;
     this.defaultSchema = defaultSchema;
@@ -852,227 +803,48 @@ class SwitchSchema<
 
 class UnknownSchema extends Schema<unknown, unknown> {
   constructor(config: Record<string, unknown> = {}) {
-    super(
-      "unknown",
-      config,
-      { unknown: { identity: (v: any): v is unknown => true } },
-      preparationMap as any,
-      transformationMap as any
-    );
+    super("unknown", config);
   }
 }
 
 class NeverSchema extends Schema<never, never> {
   constructor() {
-    super(
-      "never",
-      {},
-      validatorMap as any,
-      preparationMap as any,
-      transformationMap as any
-    );
+    super("never", {});
   }
 }
 
-type CreateSchemaBuilder<TMap extends SchemaValidatorMap> = {
-  [K in keyof Omit<TMap, "object" | "array" | "unknown" | "never">]: <
-    C extends ValidatorConfig<TMap[K]>
-  >(
-    config?: C
+type Builder = {
+  [P in Exclude<
+    (typeof plugins)[number],
+    { dataType: "switch" }
+  > as P["dataType"]]: (
+    config?: ValidatorConfig<any>
   ) => Schema<
-    InferDataType<TMap[K]>,
-    C extends { prepare: any } ? unknown : InferDataType<TMap[K]>
+    P extends SValidator<infer TOutput, any> ? TOutput : never,
+    P extends SValidator<any, infer TInput> ? TInput : never
   >;
 } & {
-  object<P extends SObjectProperties>(
-    config: SObjectOptions<P>
-  ): ObjectSchema<P, WithLoose<InferSObjectType<P>>>;
-} & {
-  switch<
-    TKey extends string | number,
-    TCases extends SwitchCase<any>,
-    TDefault extends SwitchDefault<any>
-  >(
-    keyFn: (context: ValidationContext) => TKey,
-    schemas: TCases,
-    defaultSchema?: TDefault
-  ): SwitchSchema<TKey, TCases, TDefault>;
-  record<K extends Schema<string | number, any>, V extends Schema<any, any>>(
-    config: ValidatorConfig<any> & { validate: { identity: [K, V] } }
-  ): Schema<Record<s.infer<K>, s.infer<V>>>;
-  union<T extends [Schema<any, any>, ...Schema<any, any>[]]>(
-    config: ValidatorConfig<any> & { validate: { identity: T } }
-  ): Schema<InferSchemaType<T[number]>>;
-  literal<T extends string | number | boolean | null | undefined>(
-    config: ValidatorConfig<any> & { validate: { identity: T } }
-  ): Schema<T>;
-  map<K extends Schema<any, any>, V extends Schema<any, any>>(
-    config: ValidatorConfig<any> & { validate: { identity: [K, V] } }
-  ): Schema<Map<InferSchemaType<K>, InferSchemaType<V>>>;
-  set<V extends Schema<any, any>>(
-    config: ValidatorConfig<any> & { validate: { identity: V } }
-  ): Schema<Set<InferSchemaType<V>>>;
-  instanceof<T extends new (...args: any) => any>(
-    config: ValidatorConfig<any> & { validate: { identity: T } }
-  ): Schema<InstanceType<T>>;
-  array<T extends Schema<any, any>>(
-    config: ValidatorConfig<any> & { validate: { ofType: T } }
-  ): ArraySchema<T>;
-  unknown(config?: Record<string, unknown>): UnknownSchema;
-  never(): NeverSchema;
+  switch(config: SwitchConfig): Schema<any>;
 };
 
-function createSchemaFunction<
-  TMap extends SchemaValidatorMap,
-  K extends keyof TMap
->(dataType: K, validatorMap: TMap) {
-  return function <C extends ValidatorConfig<TMap[K]>>(config?: C) {
-    type BaseType = InferDataType<TMap[K]>;
-
-    type WithOptional = C extends { optional: true }
-      ? BaseType | undefined
-      : BaseType;
-    type WithNullable = C extends { nullable: true }
-      ? WithOptional | null
-      : WithOptional;
-
-    type InputType = C extends { prepare: Record<string, unknown> }
-      ? unknown
-      : WithNullable;
-
-    return new Schema<WithNullable, InputType>(
-      dataType as string,
-      (config || {}) as any,
-      validatorMap as any,
-      preparationMap as any,
-      transformationMap as any
-    );
-  };
-}
-
-export function createSchemaBuilder<TMap extends SchemaValidatorMap>(
-  validatorMap: TMap,
-  preparationMap: Record<string, any>,
-  transformationMap: Record<string, any>
-): CreateSchemaBuilder<TMap> {
+function createSchemaBuilder(): Builder {
   const builder: any = {};
 
-  for (const key in validatorMap) {
-    if (
-      key === "object" ||
-      key === "array" ||
-      key === "unknown" ||
-      key === "never"
-    )
-      continue;
-    builder[key] = createSchemaFunction(key, validatorMap as any);
+  for (const plugin of plugins) {
+    if (plugin.dataType === "switch") continue;
+    builder[plugin.dataType] = (config?: ValidatorConfig<any>) => {
+      return new Schema(plugin.dataType, config);
+    };
   }
 
-  builder.object = <P extends SObjectProperties>(config: SObjectOptions<P>) =>
-    new ObjectSchema(config);
-
-  builder.array = <T extends Schema<any, any>>(
-    config: ValidatorConfig<any> & { validate: { ofType: T } }
-  ) => new ArraySchema(config);
-
-  builder.record = <
-    K extends Schema<string | number, any>,
-    V extends Schema<any, any>
-  >(
-    config: ValidatorConfig<any> & { validate: { identity: [K, V] } }
-  ) =>
-    new Schema<Record<s.infer<K>, s.infer<V>>>(
-      "record",
-      config,
-      validatorMap,
-      preparationMap,
-      transformationMap
-    );
-
-  builder.switch = <
-    TKey extends string | number,
-    TCases extends SwitchCase<any>,
-    TDefault extends SwitchDefault<any>
-  >(
-    keyFn: (context: ValidationContext) => TKey,
-    schemas: TCases,
-    defaultSchema?: TDefault
-  ) => {
-    return new SwitchSchema(keyFn, schemas, defaultSchema);
+  builder.switch = (config: SwitchConfig) => {
+    return new Schema("switch", config as any);
   };
 
-  builder.union = <T extends [Schema<any, any>, ...Schema<any, any>[]]>(
-    config: ValidatorConfig<any> & { validate: { identity: T } }
-  ) => {
-    return new Schema<InferSchemaType<T[number]>>(
-      "union",
-      config,
-      validatorMap,
-      preparationMap,
-      transformationMap
-    );
-  };
-
-  builder.literal = <T extends string | number | boolean | null | undefined>(
-    config: ValidatorConfig<any> & { validate: { identity: T } }
-  ) => {
-    return new Schema<T>(
-      "literal",
-      config,
-      validatorMap,
-      preparationMap,
-      transformationMap
-    );
-  };
-
-  builder.map = <K extends Schema<any, any>, V extends Schema<any, any>>(
-    config: ValidatorConfig<any> & { validate: { identity: [K, V] } }
-  ) => {
-    return new Schema<Map<InferSchemaType<K>, InferSchemaType<V>>>(
-      "map",
-      config,
-      validatorMap,
-      preparationMap,
-      transformationMap
-    );
-  };
-
-  builder.set = <V extends Schema<any, any>>(
-    config: ValidatorConfig<any> & { validate: { identity: V } }
-  ) => {
-    return new Schema<Set<InferSchemaType<V>>>(
-      "set",
-      config,
-      validatorMap,
-      preparationMap,
-      transformationMap
-    );
-  };
-
-  builder.instanceof = <T extends new (...args: any) => any>(
-    config: ValidatorConfig<any> & { validate: { identity: T } }
-  ): Schema<InstanceType<T>> => {
-    return new Schema(
-      "instanceof",
-      config,
-      validatorMap,
-      preparationMap,
-      transformationMap
-    );
-  };
-
-  builder.unknown = (config?: Record<string, unknown>) =>
-    new UnknownSchema(config);
-  builder.never = () => new NeverSchema();
-
-  return builder;
+  return builder as Builder;
 }
 
-export const s = createSchemaBuilder(
-  validatorMap,
-  preparationMap,
-  transformationMap
-);
+export const s = createSchemaBuilder();
 
 export namespace s {
   export type infer<T extends Schema<any, any>> = T extends Schema<infer U, any>

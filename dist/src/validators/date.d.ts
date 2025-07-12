@@ -1,2 +1,1 @@
-import { Plugin } from './types.js';
-export declare const datePlugin: Plugin;
+export declare const datePlugin: import('./types.js').Validator<Date, unknown>;

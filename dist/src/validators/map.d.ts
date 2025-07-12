@@ -1,2 +1,1 @@
-import { Plugin } from './types.js';
-export declare const mapPlugin: Plugin;
+export declare const mapPlugin: import('./types.js').Validator<Map<any, any>, unknown>;

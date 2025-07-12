@@ -1,4 +1,5 @@
-import { SchemaValidatorMap } from './validators/types.js';
+import { Validator, SchemaValidatorMap } from './validators/types.js';
+export declare const plugins: Validator<any, any>[];
 export declare const validatorMap: SchemaValidatorMap;
 export declare const preparationMap: Record<string, any>;
 export declare const transformationMap: Record<string, any>;

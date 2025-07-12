@@ -16,9 +16,11 @@ describe("Validation", () => {
 
   it("should validate an object", async () => {
     const schema = s.object({
-      properties: {
-        name: s.string({ validate: { minLength: 2 } }),
-        age: s.number({ validate: { min: 18 } }),
+      validate: {
+        properties: {
+          name: s.string({ validate: { minLength: 2 } }),
+          age: s.number({ validate: { min: 18 } }),
+        },
       },
     });
     await expect(schema.parse({ name: "John Doe", age: 30 })).resolves.toEqual({

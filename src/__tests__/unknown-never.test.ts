@@ -17,14 +17,10 @@ describe("Unknown and Never Validators", () => {
   describe("never", () => {
     it("should throw for any value", async () => {
       const schema = s.never();
-      // @ts-expect-error
       await expect(schema.parse(123)).rejects.toThrow(ValidationError);
 
-      // @ts-expect-error
       await expect(schema.parse("hello")).rejects.toThrow(ValidationError);
-      // @ts-expect-error
       await expect(schema.parse(null)).rejects.toThrow(ValidationError);
-      // @ts-expect-error
       await expect(schema.parse(undefined)).rejects.toThrow(ValidationError);
       await expect((schema as any).parse({})).rejects.toThrow(ValidationError);
     });

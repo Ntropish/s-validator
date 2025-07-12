@@ -1,2 +1,1 @@
-import { Plugin } from './types.js';
-export declare const booleanPlugin: Plugin;
+export declare const booleanPlugin: import('./types.js').Validator<boolean, unknown>;
