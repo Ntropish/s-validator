@@ -3,7 +3,11 @@ import { arrayValidatorMap } from "./validators/array.js";
 import { booleanValidatorMap } from "./validators/boolean.js";
 import { numberValidatorMap } from "./validators/number.js";
 import { objectValidatorMap } from "./validators/object.js";
-import { stringValidatorMap } from "./validators/string.js";
+import {
+  stringValidatorMap,
+  stringPreparations,
+  stringTransformations,
+} from "./validators/string.js";
 import { SchemaValidatorMap } from "./validators/types.js";
 import { dateValidatorMap } from "./validators/date.js";
 import { anyValidatorMap } from "./validators/any.js";
@@ -48,4 +52,12 @@ export const validatorMap: MergedValidators = {
   ...mapValidatorMap,
   ...setValidatorMap,
   ...instanceofValidatorMap,
+};
+
+export const preparationMap = {
+  string: stringPreparations,
+};
+
+export const transformationMap = {
+  string: stringTransformations,
 };

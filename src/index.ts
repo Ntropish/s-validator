@@ -1,4 +1,8 @@
-import { validatorMap } from "./validator-map.js";
+import {
+  validatorMap,
+  preparationMap,
+  transformationMap,
+} from "./validator-map.js";
 import { StandardSchemaV1 } from "./standard-schema.js";
 import {
   ValidatorFunction,
@@ -9,6 +13,8 @@ import {
   SafeParseResult,
   SafeParseError,
   SafeParseSuccess,
+  PreparationFunction,
+  TransformationFunction,
 } from "./validators/types.js";
 
 // A utility to force TS to expand a type in tooltips for better DX.
@@ -38,13 +44,21 @@ type InferConfig<Func> = Func extends (
 // Creates a typed config object from a validator collection.
 type ValidatorConfig<VCollection> = Prettify<
   {
-    [K in keyof Omit<VCollection, "identity">]?: InferConfig<VCollection[K]>;
+    [K in keyof Omit<
+      VCollection,
+      "identity" | "preparations" | "transformations" | "messages"
+    >]?: InferConfig<VCollection[K]>;
   } & {
+    preparations?: Record<string, any>;
+    transformations?: Record<string, any>;
     optional?: boolean;
     nullable?: boolean;
     messages?: Prettify<
       {
-        [K in keyof Omit<VCollection, "identity" | "messages">]?: string;
+        [K in keyof Omit<
+          VCollection,
+          "identity" | "messages" | "preparations" | "transformations"
+        >]?: string;
       } & {
         identity?: string;
       }
@@ -59,11 +73,14 @@ type InferDataType<VCollection> = VCollection extends {
   ? T
   : unknown;
 
-type InferSchemaType<T extends Schema<any>> = T extends Schema<infer U>
+type InferSchemaType<T extends Schema<any, any>> = T extends Schema<
+  infer U,
+  any
+>
   ? U
   : never;
 
-type SObjectProperties = Record<string, Schema<any>>;
+type SObjectProperties = Record<string, Schema<any, any>>;
 type InferSObjectType<P extends SObjectProperties> = Prettify<
   UndefinedToOptional<{
     [K in keyof P]: InferSchemaType<P[K]>;
@@ -88,24 +105,40 @@ function isValidationContext(thing: any): thing is ValidationContext {
   );
 }
 
-export class Schema<T> implements StandardSchemaV1<T, T> {
+export class Schema<TOutput, TInput = TOutput>
+  implements StandardSchemaV1<TInput, TOutput>
+{
   private validators: Array<{
     name: string;
-    validator: ValidatorFunction<T>;
+    validator: ValidatorFunction<TOutput>;
+    args: any[];
+  }> = [];
+  private preparations: Array<{
+    name: string;
+    preparation: PreparationFunction;
+    args: any[];
+  }> = [];
+  private transformations: Array<{
+    name: string;
+    transformation: TransformationFunction;
     args: any[];
   }> = [];
   private dataType: string;
   public config: Record<string, unknown>;
-  public readonly "~standard": StandardSchemaV1.Props<T, T>;
+  public readonly "~standard": StandardSchemaV1.Props<TInput, TOutput>;
 
   constructor(
     dataType: string,
     config: Record<string, unknown> = {},
-    validatorMap: SchemaValidatorMap
+    validatorMap: SchemaValidatorMap,
+    preparationMap: Record<string, any>,
+    transformationMap: Record<string, any>
   ) {
     this.dataType = dataType;
     this.config = config;
     const validatorCollection = validatorMap[dataType];
+    const preparationCollection = preparationMap[dataType];
+    const transformationCollection = transformationMap[dataType];
 
     if (validatorCollection?.identity) {
       this.validators.push({
@@ -120,7 +153,7 @@ export class Schema<T> implements StandardSchemaV1<T, T> {
         continue;
       }
       const validator = validatorCollection?.[validatorName];
-      if (validator) {
+      if (typeof validator === "function") {
         const args = [validatorConfig];
 
         this.validators.push({
@@ -131,11 +164,43 @@ export class Schema<T> implements StandardSchemaV1<T, T> {
       }
     }
 
+    if ("preparations" in config && preparationCollection) {
+      for (const [prepName, prepConfig] of Object.entries(
+        config.preparations as any
+      )) {
+        const preparation = preparationCollection[prepName];
+        if (typeof preparation === "function") {
+          this.preparations.push({
+            name: prepName,
+            preparation,
+            args: [prepConfig],
+          });
+        }
+      }
+    }
+
+    if ("transformations" in config && transformationCollection) {
+      for (const [transName, transConfig] of Object.entries(
+        config.transformations as any
+      )) {
+        const transformation = transformationCollection[transName];
+        if (typeof transformation === "function") {
+          this.transformations.push({
+            name: transName,
+            transformation,
+            args: [transConfig],
+          });
+        }
+      }
+    }
+
     this["~standard"] = {
       version: 1,
       vendor: "s-val",
-      validate: async (value: unknown): Promise<StandardSchemaV1.Result<T>> => {
-        const result = await this.safeParse(value as T);
+      validate: async (
+        value: unknown
+      ): Promise<StandardSchemaV1.Result<TOutput>> => {
+        const result = await this.safeParse(value as TInput);
         if (result.status === "success") {
           return { value: result.data };
         }
@@ -147,13 +212,15 @@ export class Schema<T> implements StandardSchemaV1<T, T> {
         );
         return { issues };
       },
-      types: {} as StandardSchemaV1.Types<T, T>,
+      types: {} as StandardSchemaV1.Types<TInput, TOutput>,
     };
   }
 
-  public async parse(data: T): Promise<T>;
-  public async parse(context: ValidationContext): Promise<T>;
-  public async parse(dataOrContext: T | ValidationContext): Promise<T> {
+  public async parse(data: TInput): Promise<TOutput>;
+  public async parse(context: ValidationContext): Promise<TOutput>;
+  public async parse(
+    dataOrContext: TInput | ValidationContext
+  ): Promise<TOutput> {
     const context: ValidationContext = isValidationContext(dataOrContext)
       ? dataOrContext
       : {
@@ -165,13 +232,13 @@ export class Schema<T> implements StandardSchemaV1<T, T> {
     return this._parse(context);
   }
 
-  public async safeParse(data: T): Promise<SafeParseResult<T>>;
+  public async safeParse(data: TInput): Promise<SafeParseResult<TOutput>>;
   public async safeParse(
     context: ValidationContext
-  ): Promise<SafeParseResult<T>>;
+  ): Promise<SafeParseResult<TOutput>>;
   public async safeParse(
-    dataOrContext: T | ValidationContext
-  ): Promise<SafeParseResult<T>> {
+    dataOrContext: TInput | ValidationContext
+  ): Promise<SafeParseResult<TOutput>> {
     const context: ValidationContext = isValidationContext(dataOrContext)
       ? dataOrContext
       : {
@@ -190,12 +257,18 @@ export class Schema<T> implements StandardSchemaV1<T, T> {
     }
   }
 
-  protected async _parse(context: ValidationContext): Promise<T> {
-    if (this.config.optional && context.value === undefined) {
-      return context.value;
+  protected async _parse(context: ValidationContext): Promise<TOutput> {
+    let current_value = context.value;
+
+    for (const { preparation, args } of this.preparations) {
+      current_value = await preparation(current_value, args, context, this);
     }
-    if (this.config.nullable && context.value === null) {
-      return context.value;
+
+    if (this.config.optional && current_value === undefined) {
+      return current_value as TOutput;
+    }
+    if (this.config.nullable && current_value === null) {
+      return current_value as TOutput;
     }
 
     const issues: ValidationIssue[] = [];
@@ -205,7 +278,7 @@ export class Schema<T> implements StandardSchemaV1<T, T> {
     );
     if (identityValidator) {
       const result = await identityValidator.validator(
-        context.value,
+        current_value,
         identityValidator.args,
         context,
         this
@@ -220,7 +293,7 @@ export class Schema<T> implements StandardSchemaV1<T, T> {
         if (!message) {
           message = `Invalid type. Expected ${
             this.dataType
-          }, received ${typeof context.value}. Path: '${path}'`;
+          }, received ${typeof current_value}. Path: '${path}'`;
         }
         issues.push({
           path: context.path,
@@ -232,7 +305,7 @@ export class Schema<T> implements StandardSchemaV1<T, T> {
 
     for (const { name, validator, args } of this.validators) {
       if (name === "identity") continue;
-      const result = await validator(context.value, args, context, this);
+      const result = await validator(current_value, args, context, this);
       if (!result) {
         const path = context.path.join(".");
         const messages = this.config.messages as
@@ -244,7 +317,7 @@ export class Schema<T> implements StandardSchemaV1<T, T> {
           if (name === "identity") {
             message = `Invalid type. Expected ${
               this.dataType
-            }, received ${typeof context.value}. Path: '${path}'`;
+            }, received ${typeof current_value}. Path: '${path}'`;
           } else {
             message = `Validation failed for ${this.dataType}.${name} at path '${path}'`;
           }
@@ -261,22 +334,30 @@ export class Schema<T> implements StandardSchemaV1<T, T> {
       throw new ValidationError(issues);
     }
 
-    return context.value;
+    for (const { transformation, args } of this.transformations) {
+      current_value = await transformation(current_value, args, context, this);
+    }
+
+    return current_value as TOutput;
   }
 
-  public optional(): Schema<T | undefined> {
+  public optional(): Schema<TOutput | undefined, TInput | undefined> {
     return new Schema(
       this.dataType,
       { ...this.config, optional: true },
-      validatorMap
+      validatorMap,
+      preparationMap,
+      transformationMap
     );
   }
 
-  public nullable(): Schema<T | null> {
+  public nullable(): Schema<TOutput | null, TInput | null> {
     return new Schema(
       this.dataType,
       { ...this.config, nullable: true },
-      validatorMap
+      validatorMap,
+      preparationMap,
+      transformationMap
     );
   }
 }
@@ -286,7 +367,7 @@ class ObjectSchema<
   T = InferSObjectType<P>
 > extends Schema<T> {
   constructor(config: SObjectOptions<P>) {
-    super("object", config, validatorMap);
+    super("object", config, validatorMap, preparationMap, transformationMap);
   }
 
   public partial(): ObjectSchema<P> {
@@ -365,14 +446,14 @@ class ObjectSchema<
 }
 
 class RecordSchema<
-  K extends Schema<string | number>,
-  V extends Schema<any>
+  K extends Schema<string | number, any>,
+  V extends Schema<any, any>
 > extends Schema<Record<s.infer<K>, s.infer<V>>> {
   private keySchema: K;
   private valueSchema: V;
 
   constructor(keySchema: K, valueSchema: V) {
-    super("record", {}, validatorMap);
+    super("record", {}, validatorMap, preparationMap, transformationMap);
     this.keySchema = keySchema;
     this.valueSchema = valueSchema;
   }
@@ -429,7 +510,7 @@ class SwitchSchema<
   TDefault extends SwitchDefault<any>
 > extends Schema<
   | s.infer<TCases[TKey]>
-  | (TDefault extends Schema<any> ? s.infer<TDefault> : never)
+  | (TDefault extends Schema<any, any> ? s.infer<TDefault> : never)
 > {
   private keyFn: (context: ValidationContext) => TKey;
   private schemas: TCases;
@@ -440,7 +521,13 @@ class SwitchSchema<
     schemas: TCases,
     defaultSchema?: TDefault
   ) {
-    super("switch", {}, validatorMap as SchemaValidatorMap);
+    super(
+      "switch",
+      {},
+      validatorMap as SchemaValidatorMap,
+      preparationMap,
+      transformationMap
+    );
     this.keyFn = keyFn;
     this.schemas = schemas;
     this.defaultSchema = defaultSchema;
@@ -457,14 +544,21 @@ class SwitchSchema<
   }
 }
 
-class MapSchema<K extends Schema<any>, V extends Schema<any>> extends Schema<
-  Map<InferSchemaType<K>, InferSchemaType<V>>
-> {
+class MapSchema<
+  K extends Schema<any, any>,
+  V extends Schema<any, any>
+> extends Schema<Map<InferSchemaType<K>, InferSchemaType<V>>> {
   private keySchema: K;
   private valueSchema: V;
 
   constructor(keySchema: K, valueSchema: V) {
-    super("map", {}, validatorMap as SchemaValidatorMap);
+    super(
+      "map",
+      {},
+      validatorMap as SchemaValidatorMap,
+      preparationMap,
+      transformationMap
+    );
     this.keySchema = keySchema;
     this.valueSchema = valueSchema;
   }
@@ -503,11 +597,19 @@ class MapSchema<K extends Schema<any>, V extends Schema<any>> extends Schema<
   }
 }
 
-class SetSchema<V extends Schema<any>> extends Schema<Set<InferSchemaType<V>>> {
+class SetSchema<V extends Schema<any, any>> extends Schema<
+  Set<InferSchemaType<V>>
+> {
   private valueSchema: V;
 
   constructor(valueSchema: V) {
-    super("set", {}, validatorMap as SchemaValidatorMap);
+    super(
+      "set",
+      {},
+      validatorMap as SchemaValidatorMap,
+      preparationMap,
+      transformationMap
+    );
     this.valueSchema = valueSchema;
   }
 
@@ -542,7 +644,13 @@ class InstanceOfSchema<T extends new (...args: any) => any> extends Schema<
   private constructorFn: T;
 
   constructor(constructorFn: T) {
-    super("instanceof", {}, validatorMap as SchemaValidatorMap);
+    super(
+      "instanceof",
+      {},
+      validatorMap as SchemaValidatorMap,
+      preparationMap,
+      transformationMap
+    );
     this.constructorFn = constructorFn;
   }
 
@@ -565,7 +673,13 @@ class LiteralSchema<
   private literal: T;
 
   constructor(literal: T) {
-    super("literal", {}, validatorMap as SchemaValidatorMap);
+    super(
+      "literal",
+      {},
+      validatorMap as SchemaValidatorMap,
+      preparationMap,
+      transformationMap
+    );
     this.literal = literal;
   }
 
@@ -582,13 +696,19 @@ class LiteralSchema<
   }
 }
 
-class UnionSchema<T extends [Schema<any>, ...Schema<any>[]]> extends Schema<
-  InferSchemaType<T[number]>
-> {
+class UnionSchema<
+  T extends [Schema<any, any>, ...Schema<any, any>[]]
+> extends Schema<InferSchemaType<T[number]>> {
   private schemas: T;
 
   constructor(schemas: T) {
-    super("union", {}, validatorMap as SchemaValidatorMap);
+    super(
+      "union",
+      {},
+      validatorMap as SchemaValidatorMap,
+      preparationMap,
+      transformationMap
+    );
     this.schemas = schemas;
   }
 
@@ -613,9 +733,12 @@ class UnionSchema<T extends [Schema<any>, ...Schema<any>[]]> extends Schema<
 }
 
 type CreateSchemaBuilder<TMap extends SchemaValidatorMap> = {
-  [K in keyof Omit<TMap, "object">]: (
-    config?: ValidatorConfig<TMap[K]>
-  ) => Schema<InferDataType<TMap[K]>>;
+  [K in keyof Omit<TMap, "object">]: <C extends ValidatorConfig<TMap[K]>>(
+    config?: C
+  ) => Schema<
+    InferDataType<TMap[K]>,
+    C extends { preparations: any } ? unknown : InferDataType<TMap[K]>
+  >;
 } & {
   object<P extends SObjectProperties>(
     config: SObjectOptions<P>
@@ -630,19 +753,21 @@ type CreateSchemaBuilder<TMap extends SchemaValidatorMap> = {
     schemas: TCases,
     defaultSchema?: TDefault
   ): SwitchSchema<TKey, TCases, TDefault>;
-  record<K extends Schema<string | number>, V extends Schema<any>>(
+  record<K extends Schema<string | number, any>, V extends Schema<any, any>>(
     keySchema: K,
     valueSchema: V
   ): RecordSchema<K, V>;
-  union<T extends [Schema<any>, ...Schema<any>[]]>(schemas: T): UnionSchema<T>;
+  union<T extends [Schema<any, any>, ...Schema<any, any>[]]>(
+    schemas: T
+  ): UnionSchema<T>;
   literal<T extends string | number | boolean | null | undefined>(
     literal: T
   ): LiteralSchema<T>;
-  map<K extends Schema<any>, V extends Schema<any>>(
+  map<K extends Schema<any, any>, V extends Schema<any, any>>(
     keySchema: K,
     valueSchema: V
   ): MapSchema<K, V>;
-  set<V extends Schema<any>>(valueSchema: V): SetSchema<V>;
+  set<V extends Schema<any, any>>(valueSchema: V): SetSchema<V>;
   instanceof<T extends new (...args: any) => any>(
     constructorFn: T
   ): InstanceOfSchema<T>;
@@ -662,16 +787,24 @@ function createSchemaFunction<
       ? WithOptional | null
       : WithOptional;
 
-    return new Schema<WithNullable>(
+    type InputType = C extends { preparations: Record<string, unknown> }
+      ? unknown
+      : WithNullable;
+
+    return new Schema<WithNullable, InputType>(
       dataType as string,
       (config || {}) as any,
-      validatorMap
+      validatorMap,
+      preparationMap,
+      transformationMap
     );
   };
 }
 
 export function createSchemaBuilder<TMap extends SchemaValidatorMap>(
-  validatorMap: TMap
+  validatorMap: TMap,
+  preparationMap: Record<string, any>,
+  transformationMap: Record<string, any>
 ): CreateSchemaBuilder<TMap> {
   const builder: any = {};
 
@@ -690,8 +823,8 @@ export function createSchemaBuilder<TMap extends SchemaValidatorMap>(
   };
 
   builder.record = function <
-    K extends Schema<string | number>,
-    V extends Schema<any>
+    K extends Schema<string | number, any>,
+    V extends Schema<any, any>
   >(keySchema: K, valueSchema: V) {
     return new RecordSchema(keySchema, valueSchema);
   };
@@ -708,7 +841,9 @@ export function createSchemaBuilder<TMap extends SchemaValidatorMap>(
     return new SwitchSchema(keyFn, schemas, defaultSchema);
   };
 
-  builder.union = <T extends [Schema<any>, ...Schema<any>[]]>(schemas: T) => {
+  builder.union = <T extends [Schema<any, any>, ...Schema<any, any>[]]>(
+    schemas: T
+  ) => {
     return new UnionSchema(schemas);
   };
 
@@ -718,14 +853,14 @@ export function createSchemaBuilder<TMap extends SchemaValidatorMap>(
     return new LiteralSchema(literal);
   };
 
-  builder.map = <K extends Schema<any>, V extends Schema<any>>(
+  builder.map = <K extends Schema<any, any>, V extends Schema<any, any>>(
     keySchema: K,
     valueSchema: V
   ) => {
     return new MapSchema(keySchema, valueSchema);
   };
 
-  builder.set = <V extends Schema<any>>(valueSchema: V) => {
+  builder.set = <V extends Schema<any, any>>(valueSchema: V) => {
     return new SetSchema(valueSchema);
   };
 
@@ -738,10 +873,14 @@ export function createSchemaBuilder<TMap extends SchemaValidatorMap>(
   return builder;
 }
 
-export const s = createSchemaBuilder(validatorMap);
+export const s = createSchemaBuilder(
+  validatorMap,
+  preparationMap,
+  transformationMap
+);
 
 export namespace s {
-  export type infer<T extends Schema<any>> = T extends Schema<infer U>
+  export type infer<T extends Schema<any, any>> = T extends Schema<infer U, any>
     ? U
     : never;
 }

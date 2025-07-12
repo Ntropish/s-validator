@@ -2,8 +2,36 @@ import {
   ValidatorCollection,
   SchemaLike,
   SchemaValidatorMap,
+  PreparationCollection,
+  TransformationCollection,
 } from "./types.js";
 import { regex } from "../regex.js";
+
+export const stringPreparations = {
+  coerce: (value: unknown, [enabled]: [boolean?]) => {
+    if (enabled === false) {
+      return value;
+    }
+
+    if (typeof value === "string") {
+      return value;
+    }
+    if (
+      value === null ||
+      value === undefined ||
+      (typeof value === "object" && !value.toString)
+    ) {
+      return value;
+    }
+    return String(value);
+  },
+} satisfies PreparationCollection<string>;
+
+export const stringTransformations = {
+  toUpperCase: (value: string) => value.toUpperCase(),
+  toLowerCase: (value: string) => value.toLowerCase(),
+  trim: (value: string) => value.trim(),
+} satisfies TransformationCollection<string>;
 
 export const stringValidatorMap = {
   string: {

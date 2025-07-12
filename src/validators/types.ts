@@ -17,13 +17,39 @@ export type ValidationContext = {
   readonly value: any;
 };
 
+// The simplified function signature for a single preparation.
+export type PreparationFunction<T = any, Args extends any[] = any[]> = (
+  value: T,
+  args: Args,
+  context: ValidationContext,
+  schema: Schema<T, any>
+) => any | Promise<any>;
+
+// The simplified function signature for a single transformation.
+export type TransformationFunction<T = any, Args extends any[] = any[]> = (
+  value: T,
+  args: Args,
+  context: ValidationContext,
+  schema: Schema<T, any>
+) => any | Promise<any>;
+
 // The simplified function signature for a single validator.
 export type ValidatorFunction<T = any, Args extends any[] = any[]> = (
   value: T,
   args: Args,
   context: ValidationContext,
-  schema: Schema<T>
+  schema: Schema<T, any>
 ) => boolean | Promise<boolean>;
+
+// A collection of preparations for a specific data type.
+export type PreparationCollection<T = any> = {
+  [preparationName: string]: PreparationFunction<T, any[]>;
+};
+
+// A collection of transformations for a specific data type.
+export type TransformationCollection<T = any> = {
+  [transformationName: string]: TransformationFunction<T, any[]>;
+};
 
 // A collection of validators for a specific data type.
 export type ValidatorCollection<T = any> = {
