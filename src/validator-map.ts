@@ -9,7 +9,7 @@ import {
   stringTransformations,
 } from "./validators/string.js";
 import { SchemaValidatorMap } from "./validators/types.js";
-import { dateValidatorMap } from "./validators/date.js";
+import { dateValidatorMap, datePreparations } from "./validators/date.js";
 import { anyValidatorMap } from "./validators/any.js";
 import { bigintValidatorMap } from "./validators/bigint.js";
 import { nanValidatorMap } from "./validators/nan.js";
@@ -56,6 +56,7 @@ export const validatorMap: MergedValidators = {
 
 export const preparationMap = {
   string: stringPreparations,
+  date: datePreparations,
 };
 
 export const transformationMap = {

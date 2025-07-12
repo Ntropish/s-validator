@@ -1,4 +1,26 @@
-import { ValidatorCollection, SchemaValidatorMap } from "./types.js";
+import {
+  ValidatorCollection,
+  SchemaValidatorMap,
+  PreparationCollection,
+} from "./types.js";
+
+export const datePreparations = {
+  coerce: (value: unknown, [enabled]: [boolean?]) => {
+    if (enabled === false) {
+      return value;
+    }
+    if (value instanceof Date) {
+      return value;
+    }
+    if (typeof value === "string" || typeof value === "number") {
+      const date = new Date(value);
+      if (!isNaN(date.getTime())) {
+        return date;
+      }
+    }
+    return value;
+  },
+} satisfies PreparationCollection<Date>;
 
 export const dateValidatorMap = {
   date: {

@@ -50,4 +50,22 @@ describe("Date Validator", () => {
       );
     });
   });
+
+  describe("coerce", () => {
+    it("should coerce a string to a Date object", async () => {
+      const schema = s.date({ preparations: { coerce: true } });
+      await expect(schema.parse("2023-01-01")).resolves.toBeInstanceOf(Date);
+    });
+
+    it("should coerce a number to a Date object", async () => {
+      const schema = s.date({ preparations: { coerce: true } });
+      const timestamp = new Date("2023-01-01").getTime();
+      await expect(schema.parse(timestamp)).resolves.toBeInstanceOf(Date);
+    });
+
+    it("should not coerce when disabled", async () => {
+      const schema = s.date({ preparations: { coerce: false } });
+      await expect(schema.parse("2023-01-01")).rejects.toThrow(ValidationError);
+    });
+  });
 });
