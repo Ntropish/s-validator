@@ -5,23 +5,34 @@ import {
   ValidationError,
 } from "./types.js";
 
-export const setPlugin: Plugin = {
-  set: [
+export const recordPlugin: Plugin = {
+  record: [
     {
       validate: {
         identity: {
           validator: async (
             value: unknown,
-            [valueSchema]: [Schema<any, any> | undefined],
+            [keySchema, valueSchema]: [
+              Schema<any, any> | undefined,
+              Schema<any, any> | undefined
+            ],
             context
           ) => {
-            if (!(value instanceof Set)) return false;
-            if (!valueSchema) return false;
+            if (
+              typeof value !== "object" ||
+              value === null ||
+              Array.isArray(value)
+            ) {
+              return false;
+            }
+
+            if (!keySchema || !valueSchema) return false;
 
             const issues: ValidationError[] = [];
 
-            for (const val of value.values()) {
+            for (const [key, val] of Object.entries(value)) {
               try {
+                await keySchema.parse(key, context);
                 await valueSchema.parse(val, context);
               } catch (e) {
                 if (e instanceof ValidationError) {
@@ -39,7 +50,7 @@ export const setPlugin: Plugin = {
             return true;
           },
           message: (ctx) =>
-            `Invalid type. Expected Set, received ${typeof ctx.value}.`,
+            `Invalid type. Expected a record object, received ${typeof ctx.value}.`,
         },
       } as Record<string, ValidatorDefinition<any>>,
     },

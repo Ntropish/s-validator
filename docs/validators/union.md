@@ -4,7 +4,7 @@ The `s.union()` validator allows you to combine multiple schemas into one. The v
 
 ## Usage
 
-The `s.union()` function takes an array of schemas as its only argument.
+You pass an array of schemas to the `validate.identity` property in the configuration object.
 
 ### Union of Primitive Types
 
@@ -13,7 +13,9 @@ You can use `s.union()` to allow a value to be one of several primitive types.
 ```typescript
 import { s } from "s-val";
 
-const stringOrNumber = s.union([s.string(), s.number()]);
+const stringOrNumber = s.union({
+  validate: { identity: [s.string(), s.number()] },
+});
 
 await stringOrNumber.parse("hello"); // ✅
 await stringOrNumber.parse(123); // ✅
@@ -27,21 +29,25 @@ await stringOrNumber.parse(true); // ❌
 ```typescript
 import { s } from "s-val";
 
-const eventSchema = s.union([
-  s.object({
-    properties: {
-      type: s.literal("click"),
-      x: s.number(),
-      y: s.number(),
-    },
-  }),
-  s.object({
-    properties: {
-      type: s.literal("keypress"),
-      key: s.string(),
-    },
-  }),
-]);
+const eventSchema = s.union({
+  validate: {
+    identity: [
+      s.object({
+        properties: {
+          type: s.literal({ validate: { identity: "click" } }),
+          x: s.number(),
+          y: s.number(),
+        },
+      }),
+      s.object({
+        properties: {
+          type: s.literal({ validate: { identity: "keypress" } }),
+          key: s.string(),
+        },
+      }),
+    ],
+  },
+});
 
 // Valid click event
 await eventSchema.parse({

@@ -7,7 +7,9 @@ class TestClass {}
 describe("Advanced Type Validators", () => {
   describe("map", () => {
     it("should validate a correct map", async () => {
-      const schema = s.map(s.string(), s.number());
+      const schema = s.map({
+        validate: { identity: [s.string(), s.number()] },
+      });
       const map = new Map([
         ["a", 1],
         ["b", 2],
@@ -16,13 +18,17 @@ describe("Advanced Type Validators", () => {
     });
 
     it("should throw for an invalid key", async () => {
-      const schema = s.map(s.string(), s.number());
+      const schema = s.map({
+        validate: { identity: [s.string(), s.number()] },
+      });
       const map = new Map([[1, 1]]);
       await expect((schema as any).parse(map)).rejects.toThrow(ValidationError);
     });
 
     it("should throw for an invalid value", async () => {
-      const schema = s.map(s.string(), s.number());
+      const schema = s.map({
+        validate: { identity: [s.string(), s.number()] },
+      });
       const map = new Map([["a", "1"]]);
       await expect((schema as any).parse(map)).rejects.toThrow(ValidationError);
     });
@@ -30,13 +36,13 @@ describe("Advanced Type Validators", () => {
 
   describe("set", () => {
     it("should validate a correct set", async () => {
-      const schema = s.set(s.number());
+      const schema = s.set({ validate: { identity: s.number() } });
       const set = new Set([1, 2, 3]);
       await expect(schema.parse(set)).resolves.toEqual(set);
     });
 
     it("should throw for an invalid value in a set", async () => {
-      const schema = s.set(s.number());
+      const schema = s.set({ validate: { identity: s.number() } });
       const set = new Set([1, "2", 3]);
       await expect((schema as any).parse(set)).rejects.toThrow(ValidationError);
     });

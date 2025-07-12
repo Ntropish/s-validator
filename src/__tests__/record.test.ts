@@ -3,7 +3,9 @@ import { s } from "../index.js";
 
 describe("Record Validator", () => {
   it("should validate a record with string keys and string values", async () => {
-    const schema = s.record(s.string().asKey(), s.string());
+    const schema = s.record({
+      validate: { identity: [s.string(), s.string()] },
+    });
     const data = {
       name: "John Doe",
       email: "john.doe@example.com",
@@ -12,7 +14,9 @@ describe("Record Validator", () => {
   });
 
   it("should fail if a value does not match the value schema", async () => {
-    const schema = s.record(s.string().asKey(), s.number());
+    const schema = s.record({
+      validate: { identity: [s.string(), s.number()] },
+    });
     const data = {
       age: 30,
       score: "100", // Invalid value
@@ -22,10 +26,11 @@ describe("Record Validator", () => {
 
   it("should fail if a key does not match the key schema", async () => {
     // Keys must be UUIDs
-    const schema = s.record(
-      s.string({ validate: { uuid: true } }).asKey(),
-      s.any()
-    );
+    const schema = s.record({
+      validate: {
+        identity: [s.string({ validate: { uuid: true } }), s.string()],
+      },
+    });
     const data = {
       "f47ac10b-58cc-4372-a567-0e02b2c3d479": "valid",
       "not-a-uuid": "invalid",
@@ -35,7 +40,9 @@ describe("Record Validator", () => {
 
   it("should handle numeric keys correctly", async () => {
     // NOTE: Object.keys() converts keys to strings. The string validator must handle this.
-    const schema = s.record(s.string().asKey(), s.boolean());
+    const schema = s.record({
+      validate: { identity: [s.string(), s.boolean()] },
+    });
     const data = {
       1: true,
       2: false,
@@ -44,7 +51,7 @@ describe("Record Validator", () => {
   });
 
   it("should fail for non-object inputs", async () => {
-    const schema = s.record(s.string().asKey(), s.any());
+    const schema = s.record({ validate: { identity: [s.string(), s.any()] } });
     await expect(schema.parse(null)).rejects.toThrow();
     await expect(schema.parse(undefined)).rejects.toThrow();
     // @ts-expect-error - An array is not a valid record input.
@@ -54,7 +61,7 @@ describe("Record Validator", () => {
   });
 
   it("should handle empty objects", async () => {
-    const schema = s.record(s.string().asKey(), s.any());
+    const schema = s.record({ validate: { identity: [s.string(), s.any()] } });
     await expect(schema.parse({})).resolves.toEqual({});
   });
 
@@ -65,10 +72,11 @@ describe("Record Validator", () => {
         email: s.string({ validate: { email: true } }),
       },
     });
-    const schema = s.record(
-      s.string({ validate: { uuid: true } }).asKey(),
-      userSchema
-    );
+    const schema = s.record({
+      validate: {
+        identity: [s.string({ validate: { uuid: true } }), userSchema],
+      },
+    });
     const data = {
       "f47ac10b-58cc-4372-a567-0e02b2c3d479": {
         name: "John Doe",
@@ -89,10 +97,11 @@ describe("Record Validator", () => {
         email: s.string({ validate: { email: true } }),
       },
     });
-    const schema = s.record(
-      s.string({ validate: { uuid: true } }).asKey(),
-      userSchema
-    );
+    const schema = s.record({
+      validate: {
+        identity: [s.string({ validate: { uuid: true } }), userSchema],
+      },
+    });
     const data = {
       "f47ac10b-58cc-4372-a567-0e02b2c3d479": {
         name: "John Doe",

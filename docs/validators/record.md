@@ -2,20 +2,22 @@
 
 The `record` validator is used to check objects where you want to validate all keys and values against specific schemas, but you don't know the exact keys ahead of time. This is useful for dictionaries, lookup tables, or any object used as a key-value store.
 
-It is similar to the `s.map()` validator, but it works with plain JavaScript objects instead of `Map` instances.
+It is similar to `s.map()`, but it works with plain JavaScript objects instead of `Map` instances.
 
 ## Usage
 
-You create a record schema by providing two arguments:
+You create a record schema by passing the key and value schemas as a tuple to the `validate.identity` property.
 
-1.  A schema for the keys. This must be `s.string()`, `s.number()`, or a literal schema (`s.literal()`) containing strings or numbers. Using any other schema type for the key will result in a compile-time TypeScript error.
-2.  A schema for the values. This can be any `s-val` schema.
+1.  The first element of the tuple is the schema for the keys. This must be `s.string()` or `s.number()`.
+2.  The second element is the schema for the values. This can be any `s-val` schema.
 
 ```typescript
 import { s } from "s-val";
 
 // A record where keys are strings and values are numbers.
-const scoresSchema = s.record(s.string(), s.number());
+const scoresSchema = s.record({
+  validate: { identity: [s.string(), s.number()] },
+});
 
 const scores = {
   player1: 100,
@@ -32,10 +34,11 @@ The key schema is enforced for every key in the object. For example, you can req
 
 ```typescript
 // A record where keys must be valid UUIDs.
-const userRolesSchema = s.record(
-  s.string({ validate: { uuid: true } }),
-  s.string()
-);
+const userRolesSchema = s.record({
+  validate: {
+    identity: [s.string({ validate: { uuid: true } }), s.string()],
+  },
+});
 
 const validRoles = {
   "f47ac10b-58cc-4372-a567-0e02b2c3d479": "admin",
@@ -67,10 +70,11 @@ const userSchema = s.object({
   },
 });
 
-const usersByIdSchema = s.record(
-  s.string({ validate: { uuid: true } }),
-  userSchema
-);
+const usersByIdSchema = s.record({
+  validate: {
+    identity: [s.string({ validate: { uuid: true } }), userSchema],
+  },
+});
 
 const validUsers = {
   "f47ac10b-58cc-4372-a567-0e02b2c3d479": {

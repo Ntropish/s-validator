@@ -13,6 +13,9 @@ import { objectPlugin } from "./validators/object.js";
 import { setPlugin } from "./validators/set.js";
 import { stringPlugin } from "./validators/string.js";
 import { unknownPlugin } from "./validators/unknown.js";
+import { literalPlugin } from "./validators/literal.js";
+import { unionPlugin } from "./validators/union.js";
+import { recordPlugin } from "./validators/record.js";
 
 const plugins: Plugin[] = [
   anyPlugin,
@@ -21,13 +24,16 @@ const plugins: Plugin[] = [
   booleanPlugin,
   datePlugin,
   instanceofPlugin,
+  literalPlugin,
   mapPlugin,
   nanPlugin,
   neverPlugin,
   numberPlugin,
   objectPlugin,
+  recordPlugin,
   setPlugin,
   stringPlugin,
+  unionPlugin,
   unknownPlugin,
 ];
 

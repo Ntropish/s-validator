@@ -4,20 +4,26 @@ import { ValidationError } from "../validators/types.js";
 
 describe("Union Validator", () => {
   it("should pass if the value matches one of the schemas", async () => {
-    const schema = s.union([s.string(), s.number()]);
+    const schema = s.union({
+      validate: { identity: [s.string(), s.number()] },
+    });
     await expect(schema.parse("hello")).resolves.toBe("hello");
     await expect(schema.parse(123)).resolves.toBe(123);
   });
 
   it("should throw if the value does not match any of the schemas", async () => {
-    const schema = s.union([s.string(), s.number()]);
+    const schema = s.union({
+      validate: { identity: [s.string(), s.number()] },
+    });
     await expect(schema.parse(true as any)).rejects.toThrow(ValidationError);
   });
 
   it("should pass with more complex schemas", async () => {
     const stringSchema = s.string({ validate: { minLength: 5 } });
     const numberSchema = s.number({ validate: { min: 100 } });
-    const schema = s.union([stringSchema, numberSchema]);
+    const schema = s.union({
+      validate: { identity: [stringSchema, numberSchema] },
+    });
 
     await expect(schema.parse("long enough")).resolves.toBe("long enough");
     await expect(schema.parse(150)).resolves.toBe(150);
@@ -26,7 +32,9 @@ describe("Union Validator", () => {
   it("should throw with more complex schemas if validation fails", async () => {
     const stringSchema = s.string({ validate: { minLength: 6 } });
     const numberSchema = s.number({ validate: { min: 100 } });
-    const schema = s.union([stringSchema, numberSchema]);
+    const schema = s.union({
+      validate: { identity: [stringSchema, numberSchema] },
+    });
 
     const result = await schema.safeParse("short");
     expect(result.status).toBe("error");
@@ -38,17 +46,17 @@ describe("Union Validator", () => {
   it("should work with object schemas", async () => {
     const schemaA = s.object({
       properties: {
-        type: s.string({ validate: { oneOf: ["a"] } }),
+        type: s.literal({ validate: { identity: "a" } }),
         a: s.string(),
       },
     });
     const schemaB = s.object({
       properties: {
-        type: s.string({ validate: { oneOf: ["b"] } }),
+        type: s.literal({ validate: { identity: "b" } }),
         b: s.number(),
       },
     });
-    const schema = s.union([schemaA, schemaB]);
+    const schema = s.union({ validate: { identity: [schemaA, schemaB] } });
     const dataA = { type: "a", a: "hello" };
     const dataB = { type: "b", b: 123 };
     const invalidData = { type: "a", a: 123 };

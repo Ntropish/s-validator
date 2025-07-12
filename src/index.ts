@@ -574,80 +574,6 @@ class ObjectSchema<
     });
   }
 
-  public partial(): ObjectSchema<P> {
-    const originalProperties = this.config.properties as P;
-    const newProperties: P = {} as any;
-
-    for (const key in originalProperties) {
-      newProperties[key] = originalProperties[key].optional() as any;
-    }
-
-    const newConfig: SObjectOptions<P> = {
-      ...this.config,
-      properties: newProperties,
-    };
-    return new ObjectSchema(newConfig);
-  }
-
-  public pick<K extends keyof P>(keys: K[]): ObjectSchema<Pick<P, K>> {
-    const originalProperties = this.config.properties as P;
-    const newProperties = {} as Pick<P, K>;
-
-    for (const key of keys) {
-      if (key in originalProperties) {
-        newProperties[key] = originalProperties[key];
-      }
-    }
-
-    const newConfig = {
-      ...this.config,
-      properties: newProperties,
-      strict: true,
-    };
-    return new ObjectSchema(newConfig);
-  }
-
-  public omit<K extends keyof P>(keys: K[]): ObjectSchema<Omit<P, K>> {
-    const originalProperties = this.config.properties as P;
-    const newProperties = { ...originalProperties };
-
-    for (const key of keys) {
-      delete newProperties[key];
-    }
-
-    const newConfig = {
-      ...this.config,
-      properties: newProperties,
-      strict: true,
-    };
-    return new ObjectSchema(newConfig);
-  }
-
-  public extend<P2 extends SObjectProperties>(
-    extension: P2
-  ): ObjectSchema<P & P2> {
-    const originalProperties = this.config.properties as P;
-
-    const newConfig = {
-      ...this.config,
-      properties: {
-        ...originalProperties,
-        ...extension,
-      },
-      strict: false,
-    };
-    return new ObjectSchema(newConfig);
-  }
-
-  public strict(): ObjectSchema<P, T> {
-    const newConfig = {
-      ...this.config,
-      strict: true,
-      properties: this.config.properties as P,
-    };
-    return new ObjectSchema(newConfig);
-  }
-
   public optional(): Schema<T | undefined, T | undefined> {
     return new ObjectSchema({ ...(this.config as any), optional: true });
   }
@@ -855,152 +781,6 @@ class ArraySchema<T extends Schema<any, any>> extends Schema<
   }
 }
 
-class RecordSchema<
-  K extends Schema<string | number, any>,
-  V extends Schema<any, any>
-> extends Schema<Record<s.infer<K>, s.infer<V>>> {
-  private keySchema: K;
-  private valueSchema: V;
-
-  constructor(keySchema: K, valueSchema: V, config: ValidatorConfig<any> = {}) {
-    super(
-      "record",
-      config,
-      validatorMap as any,
-      preparationMap as any,
-      transformationMap as any
-    );
-    this.keySchema = keySchema;
-    this.valueSchema = valueSchema;
-  }
-
-  public async _prepare(context: ValidationContext): Promise<any> {
-    const value = await super._prepare(context);
-    if (typeof value !== "object" || value === null || Array.isArray(value)) {
-      return value;
-    }
-
-    const preparedRecord: Record<string, any> = {};
-    for (const [key, val] of Object.entries(value)) {
-      preparedRecord[key] = await this.valueSchema._prepare({
-        ...context,
-        value: val,
-        path: [...context.path, key],
-      });
-    }
-    return preparedRecord;
-  }
-
-  public async _validate(
-    value: any,
-    context: ValidationContext
-  ): Promise<void> {
-    await super._validate(value, context);
-
-    if (typeof value !== "object" || Array.isArray(value)) {
-      throw new ValidationError([
-        { path: context.path, message: "Input must be a record-like object." },
-      ]);
-    }
-
-    const issues: ValidationIssue[] = [];
-    for (const [key, val] of Object.entries(value)) {
-      const keyContext = {
-        ...context,
-        value: key,
-        path: [...context.path, key],
-      };
-      try {
-        const preparedKey = await this.keySchema._prepare(keyContext);
-        await this.keySchema._validate(preparedKey, {
-          ...keyContext,
-          value: preparedKey,
-        });
-      } catch (e) {
-        if (e instanceof ValidationError) {
-          issues.push(
-            ...e.issues.map((issue) => ({
-              ...issue,
-              message: `Invalid key: ${issue.message}`,
-            }))
-          );
-        } else {
-          throw e;
-        }
-      }
-
-      const valueContext = {
-        ...context,
-        value: val,
-        path: [...context.path, key],
-      };
-      try {
-        await this.valueSchema._validate(val, valueContext);
-      } catch (e) {
-        if (e instanceof ValidationError) {
-          issues.push(...e.issues);
-        } else {
-          throw e;
-        }
-      }
-    }
-
-    if (issues.length > 0) {
-      throw new ValidationError(issues);
-    }
-  }
-
-  public async _transform(
-    value: any,
-    context: ValidationContext
-  ): Promise<Record<s.infer<K>, s.infer<V>>> {
-    if (typeof value !== "object" || value === null || Array.isArray(value)) {
-      return value;
-    }
-
-    const finalRecord: Record<string | number, s.infer<V>> = {};
-    for (const [key, val] of Object.entries(value as object)) {
-      const valueContext = {
-        ...context,
-        value: val,
-        path: [...context.path, key],
-      };
-
-      const transformedKey = await this.keySchema.parse(key);
-      const transformedValue = await this.valueSchema._transform(
-        val,
-        valueContext
-      );
-      finalRecord[transformedKey as any] = transformedValue;
-    }
-
-    return super._transform(finalRecord, {
-      ...context,
-      value: finalRecord,
-    }) as any;
-  }
-
-  public optional(): Schema<
-    Record<s.infer<K>, s.infer<V>> | undefined,
-    Record<s.infer<K>, s.infer<V>> | undefined
-  > {
-    return new RecordSchema(this.keySchema, this.valueSchema, {
-      ...(this.config as any),
-      optional: true,
-    }) as any;
-  }
-
-  public nullable(): Schema<
-    Record<s.infer<K>, s.infer<V>> | null,
-    Record<s.infer<K>, s.infer<V>> | null
-  > {
-    return new RecordSchema(this.keySchema, this.valueSchema, {
-      ...(this.config as any),
-      nullable: true,
-    }) as any;
-  }
-}
-
 type SwitchCase<T> = Record<string | number, Schema<T>>;
 type SwitchDefault<T> = Schema<T> | undefined;
 
@@ -1070,239 +850,6 @@ class SwitchSchema<
   }
 }
 
-class MapSchema<
-  K extends Schema<any, any>,
-  V extends Schema<any, any>
-> extends Schema<Map<InferSchemaType<K>, InferSchemaType<V>>> {
-  private keySchema: K;
-  private valueSchema: V;
-
-  constructor(keySchema: K, valueSchema: V) {
-    super(
-      "map",
-      {},
-      validatorMap as any,
-      preparationMap as any,
-      transformationMap as any
-    );
-    this.keySchema = keySchema;
-    this.valueSchema = valueSchema;
-  }
-
-  public async _prepare(context: ValidationContext): Promise<any> {
-    const value = await super._prepare(context);
-    if (!(value instanceof Map)) {
-      return value;
-    }
-
-    const preparedMap = new Map();
-    for (const [key, val] of value.entries()) {
-      preparedMap.set(
-        key,
-        await this.valueSchema._prepare({
-          ...context,
-          value: val,
-          path: [...context.path, key, "value"],
-        })
-      );
-    }
-    return preparedMap;
-  }
-
-  public async _validate(
-    value: any,
-    context: ValidationContext
-  ): Promise<void> {
-    await super._validate(value, context);
-    if (value === undefined || value === null) return;
-
-    if (!(value instanceof Map)) {
-      throw new ValidationError([
-        { path: context.path, message: "Invalid type. Expected a Map." },
-      ]);
-    }
-
-    const issues: ValidationIssue[] = [];
-    for (const [key, val] of value.entries()) {
-      const keyContext = {
-        ...context,
-        value: key,
-        path: [...context.path, key, "key"],
-      };
-      try {
-        const preparedKey = await this.keySchema._prepare(keyContext);
-        await this.keySchema._validate(preparedKey, {
-          ...keyContext,
-          value: preparedKey,
-        });
-      } catch (e) {
-        if (e instanceof ValidationError) {
-          issues.push(
-            ...e.issues.map((issue) => ({
-              ...issue,
-              message: `Invalid key: ${issue.message}`,
-            }))
-          );
-        } else {
-          throw e;
-        }
-      }
-
-      const valueContext = {
-        ...context,
-        value: val,
-        path: [...context.path, key, "value"],
-      };
-      try {
-        await this.valueSchema._validate(val, valueContext);
-      } catch (e) {
-        if (e instanceof ValidationError) {
-          issues.push(...e.issues);
-        } else {
-          throw e;
-        }
-      }
-    }
-
-    if (issues.length > 0) {
-      throw new ValidationError(issues);
-    }
-  }
-
-  public async _transform(
-    value: any,
-    context: ValidationContext
-  ): Promise<Map<InferSchemaType<K>, InferSchemaType<V>>> {
-    if (!(value instanceof Map)) {
-      return value;
-    }
-
-    const newMap = new Map();
-    for (const [key, val] of value.entries()) {
-      const valueContext = {
-        ...context,
-        value: val,
-        path: [...context.path, key, "value"],
-      };
-
-      const transformedKey = await this.keySchema.parse(key);
-      const transformedValue = await this.valueSchema._transform(
-        val,
-        valueContext
-      );
-      newMap.set(transformedKey, transformedValue);
-    }
-
-    return super._transform(newMap, { ...context, value: newMap }) as any;
-  }
-
-  public optional(): Schema<
-    Map<InferSchemaType<K>, InferSchemaType<V>> | undefined
-  > {
-    return new MapSchema(this.keySchema, this.valueSchema) as any;
-  }
-
-  public nullable(): Schema<Map<
-    InferSchemaType<K>,
-    InferSchemaType<V>
-  > | null> {
-    return new MapSchema(this.keySchema, this.valueSchema) as any;
-  }
-}
-
-class SetSchema<V extends Schema<any, any>> extends Schema<
-  Set<InferSchemaType<V>>
-> {
-  private valueSchema: V;
-
-  constructor(valueSchema: V) {
-    super(
-      "set",
-      {},
-      validatorMap as any,
-      preparationMap as any,
-      transformationMap as any
-    );
-    this.valueSchema = valueSchema;
-  }
-
-  public async _prepare(context: ValidationContext): Promise<any> {
-    const value = await super._prepare(context);
-    if (!(value instanceof Set)) {
-      return value;
-    }
-
-    const preparedSet = new Set();
-    for (const val of value.values()) {
-      preparedSet.add(
-        await this.valueSchema._prepare({
-          ...context,
-          value: val,
-          path: [...context.path, val],
-        })
-      );
-    }
-    return preparedSet;
-  }
-
-  public async _validate(
-    value: any,
-    context: ValidationContext
-  ): Promise<void> {
-    await super._validate(value, context);
-    if (value === undefined || value === null) return;
-
-    if (!(value instanceof Set)) {
-      throw new ValidationError([
-        { path: context.path, message: "Invalid type. Expected a Set." },
-      ]);
-    }
-
-    const issues: ValidationIssue[] = [];
-    for (const val of value.values()) {
-      const valueContext = {
-        ...context,
-        value: val,
-        path: [...context.path, val],
-      };
-      try {
-        await this.valueSchema._validate(val, valueContext);
-      } catch (e) {
-        if (e instanceof ValidationError) {
-          issues.push(...e.issues);
-        } else {
-          throw e;
-        }
-      }
-    }
-
-    if (issues.length > 0) {
-      throw new ValidationError(issues);
-    }
-  }
-
-  public async _transform(
-    value: any,
-    context: ValidationContext
-  ): Promise<Set<InferSchemaType<V>>> {
-    if (!this.customTransformations.length) {
-      return value as Set<InferSchemaType<V>>;
-    }
-    let current_value = value;
-    for (const transform of this.customTransformations) {
-      current_value = await transform(current_value, [], context, this);
-    }
-    return current_value;
-  }
-
-  public optional(): Schema<Set<InferSchemaType<V>> | undefined> {
-    return new SetSchema(this.valueSchema).optional();
-  }
-  public nullable(): Schema<Set<InferSchemaType<V>> | null> {
-    return new SetSchema(this.valueSchema).nullable();
-  }
-}
-
 class UnknownSchema extends Schema<unknown, unknown> {
   constructor(config: Record<string, unknown> = {}) {
     super(
@@ -1324,127 +871,6 @@ class NeverSchema extends Schema<never, never> {
       preparationMap as any,
       transformationMap as any
     );
-  }
-}
-
-class LiteralSchema<
-  T extends string | number | boolean | null | undefined
-> extends Schema<T> {
-  private literal: T;
-
-  constructor(literal: T) {
-    super(
-      "literal",
-      {},
-      validatorMap as any,
-      preparationMap as any,
-      transformationMap as any
-    );
-    this.literal = literal;
-  }
-
-  public async _validate(
-    value: any,
-    context: ValidationContext
-  ): Promise<void> {
-    await super._validate(value, context);
-    if (this.config.optional && value === undefined) return;
-    if (this.config.nullable && value === null) {
-      if (this.literal === null) return;
-    }
-
-    if (value !== this.literal) {
-      throw new ValidationError([
-        {
-          path: context.path,
-          message: `Invalid literal value. Expected ${JSON.stringify(
-            this.literal
-          )}, received ${JSON.stringify(value)}`,
-        },
-      ]);
-    }
-  }
-
-  public optional(): Schema<T | undefined> {
-    return new LiteralSchema(this.literal) as any;
-  }
-
-  public nullable(): Schema<T | null> {
-    return new LiteralSchema(this.literal) as any;
-  }
-}
-
-class UnionSchema<
-  T extends [Schema<any, any>, ...Schema<any, any>[]]
-> extends Schema<InferSchemaType<T[number]>> {
-  private schemas: T;
-
-  constructor(schemas: T) {
-    super(
-      "union",
-      {},
-      validatorMap as any,
-      preparationMap as any,
-      transformationMap as any
-    );
-    this.schemas = schemas;
-  }
-
-  public async _validate(
-    value: any,
-    context: ValidationContext
-  ): Promise<void> {
-    const issues: ValidationIssue[] = [];
-    for (const schema of this.schemas) {
-      try {
-        await schema._validate(value, context);
-        // If one schema validates successfully, the union is valid.
-        return;
-      } catch (e) {
-        if (e instanceof ValidationError) {
-          issues.push(...e.issues);
-        } else {
-          // Re-throw unexpected errors
-          throw e;
-        }
-      }
-    }
-    // If no schema validated, throw a collected error.
-    throw new ValidationError(issues);
-  }
-
-  public async _transform(
-    value: any,
-    context: ValidationContext
-  ): Promise<any> {
-    for (const schema of this.schemas) {
-      try {
-        // We need to re-run validate to know which schema to use for transform
-        await schema._validate(value, context);
-        return schema._transform(value, context);
-      } catch (e) {
-        // Ignore validation errors and try the next schema
-        if (!(e instanceof ValidationError)) {
-          throw e;
-        }
-      }
-    }
-    // This should be unreachable if validation passed
-    return value;
-  }
-
-  public optional(): Schema<InferSchemaType<T[number]> | undefined> {
-    const newConfig = { ...this.config, optional: true };
-    const newUnion = new UnionSchema(this.schemas);
-    newUnion.config.optional = true;
-    return newUnion as any;
-  }
-
-  public nullable(): Schema<InferSchemaType<T[number]> | null> {
-    const newConfig = { ...this.config, nullable: true };
-    const newUnion = new UnionSchema(this.schemas);
-    newUnion.config.nullable = true;
-    return newUnion as any;
   }
 }
 
@@ -1472,20 +898,20 @@ type CreateSchemaBuilder<TMap extends SchemaValidatorMap> = {
     defaultSchema?: TDefault
   ): SwitchSchema<TKey, TCases, TDefault>;
   record<K extends Schema<string | number, any>, V extends Schema<any, any>>(
-    keySchema: K,
-    valueSchema: V
-  ): RecordSchema<K, V>;
+    config: ValidatorConfig<any> & { validate: { identity: [K, V] } }
+  ): Schema<Record<s.infer<K>, s.infer<V>>>;
   union<T extends [Schema<any, any>, ...Schema<any, any>[]]>(
-    schemas: T
-  ): UnionSchema<T>;
+    config: ValidatorConfig<any> & { validate: { identity: T } }
+  ): Schema<InferSchemaType<T[number]>>;
   literal<T extends string | number | boolean | null | undefined>(
-    literal: T
-  ): LiteralSchema<T>;
+    config: ValidatorConfig<any> & { validate: { identity: T } }
+  ): Schema<T>;
   map<K extends Schema<any, any>, V extends Schema<any, any>>(
-    keySchema: K,
-    valueSchema: V
-  ): MapSchema<K, V>;
-  set<V extends Schema<any, any>>(valueSchema: V): SetSchema<V>;
+    config: ValidatorConfig<any> & { validate: { identity: [K, V] } }
+  ): Schema<Map<InferSchemaType<K>, InferSchemaType<V>>>;
+  set<V extends Schema<any, any>>(
+    config: ValidatorConfig<any> & { validate: { identity: V } }
+  ): Schema<Set<InferSchemaType<V>>>;
   instanceof<T extends new (...args: any) => any>(
     config: ValidatorConfig<any> & { validate: { identity: T } }
   ): Schema<InstanceType<T>>;
@@ -1553,10 +979,15 @@ export function createSchemaBuilder<TMap extends SchemaValidatorMap>(
     K extends Schema<string | number, any>,
     V extends Schema<any, any>
   >(
-    keySchema: K,
-    valueSchema: V,
-    config?: ValidatorConfig<any>
-  ) => new RecordSchema(keySchema, valueSchema, config);
+    config: ValidatorConfig<any> & { validate: { identity: [K, V] } }
+  ) =>
+    new Schema<Record<s.infer<K>, s.infer<V>>>(
+      "record",
+      config,
+      validatorMap,
+      preparationMap,
+      transformationMap
+    );
 
   builder.switch = <
     TKey extends string | number,
@@ -1571,26 +1002,51 @@ export function createSchemaBuilder<TMap extends SchemaValidatorMap>(
   };
 
   builder.union = <T extends [Schema<any, any>, ...Schema<any, any>[]]>(
-    schemas: T
+    config: ValidatorConfig<any> & { validate: { identity: T } }
   ) => {
-    return new UnionSchema(schemas);
+    return new Schema<InferSchemaType<T[number]>>(
+      "union",
+      config,
+      validatorMap,
+      preparationMap,
+      transformationMap
+    );
   };
 
   builder.literal = <T extends string | number | boolean | null | undefined>(
-    literal: T
+    config: ValidatorConfig<any> & { validate: { identity: T } }
   ) => {
-    return new LiteralSchema(literal);
+    return new Schema<T>(
+      "literal",
+      config,
+      validatorMap,
+      preparationMap,
+      transformationMap
+    );
   };
 
   builder.map = <K extends Schema<any, any>, V extends Schema<any, any>>(
-    keySchema: K,
-    valueSchema: V
+    config: ValidatorConfig<any> & { validate: { identity: [K, V] } }
   ) => {
-    return new MapSchema(keySchema, valueSchema);
+    return new Schema<Map<InferSchemaType<K>, InferSchemaType<V>>>(
+      "map",
+      config,
+      validatorMap,
+      preparationMap,
+      transformationMap
+    );
   };
 
-  builder.set = <V extends Schema<any, any>>(valueSchema: V) => {
-    return new SetSchema(valueSchema);
+  builder.set = <V extends Schema<any, any>>(
+    config: ValidatorConfig<any> & { validate: { identity: V } }
+  ) => {
+    return new Schema<Set<InferSchemaType<V>>>(
+      "set",
+      config,
+      validatorMap,
+      preparationMap,
+      transformationMap
+    );
   };
 
   builder.instanceof = <T extends new (...args: any) => any>(
