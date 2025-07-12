@@ -3,7 +3,7 @@ import { s } from "../index.js";
 
 describe("Record Validator", () => {
   it("should validate a record with string keys and string values", async () => {
-    const schema = s.record(s.string(), s.string());
+    const schema = s.record(s.string().asKey(), s.string());
     const data = {
       name: "John Doe",
       email: "john.doe@example.com",
@@ -12,18 +12,20 @@ describe("Record Validator", () => {
   });
 
   it("should fail if a value does not match the value schema", async () => {
-    const schema = s.record(s.string(), s.number());
+    const schema = s.record(s.string().asKey(), s.number());
     const data = {
       age: 30,
       score: "100", // Invalid value
     };
-    // @ts-expect-error - Testing runtime validation by passing a string where a number is expected.
     await expect(schema.parse(data)).rejects.toThrow();
   });
 
   it("should fail if a key does not match the key schema", async () => {
     // Keys must be UUIDs
-    const schema = s.record(s.string({ validate: { uuid: true } }), s.any());
+    const schema = s.record(
+      s.string({ validate: { uuid: true } }).asKey(),
+      s.any()
+    );
     const data = {
       "f47ac10b-58cc-4372-a567-0e02b2c3d479": "valid",
       "not-a-uuid": "invalid",
@@ -33,7 +35,7 @@ describe("Record Validator", () => {
 
   it("should handle numeric keys correctly", async () => {
     // NOTE: Object.keys() converts keys to strings. The string validator must handle this.
-    const schema = s.record(s.string(), s.boolean());
+    const schema = s.record(s.string().asKey(), s.boolean());
     const data = {
       1: true,
       2: false,
@@ -42,17 +44,17 @@ describe("Record Validator", () => {
   });
 
   it("should fail for non-object inputs", async () => {
-    const schema = s.record(s.string(), s.any());
+    const schema = s.record(s.string().asKey(), s.any());
     await expect(schema.parse(null)).rejects.toThrow();
     await expect(schema.parse(undefined)).rejects.toThrow();
-    // @ts-expect-error - Testing runtime validation by passing an array where an object is expected.
+    // @ts-expect-error - An array is not a valid record input.
     await expect(schema.parse([])).rejects.toThrow();
-    // @ts-expect-error - Testing runtime validation by passing a primitive where an object is expected.
+    // @ts-expect-error - A primitive is not a valid record input.
     await expect(schema.parse("a string")).rejects.toThrow();
   });
 
   it("should handle empty objects", async () => {
-    const schema = s.record(s.string(), s.any());
+    const schema = s.record(s.string().asKey(), s.any());
     await expect(schema.parse({})).resolves.toEqual({});
   });
 
@@ -63,7 +65,10 @@ describe("Record Validator", () => {
         email: s.string({ validate: { email: true } }),
       },
     });
-    const schema = s.record(s.string({ validate: { uuid: true } }), userSchema);
+    const schema = s.record(
+      s.string({ validate: { uuid: true } }).asKey(),
+      userSchema
+    );
     const data = {
       "f47ac10b-58cc-4372-a567-0e02b2c3d479": {
         name: "John Doe",
@@ -84,7 +89,10 @@ describe("Record Validator", () => {
         email: s.string({ validate: { email: true } }),
       },
     });
-    const schema = s.record(s.string({ validate: { uuid: true } }), userSchema);
+    const schema = s.record(
+      s.string({ validate: { uuid: true } }).asKey(),
+      userSchema
+    );
     const data = {
       "f47ac10b-58cc-4372-a567-0e02b2c3d479": {
         name: "John Doe",

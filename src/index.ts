@@ -435,6 +435,11 @@ export class Schema<TOutput, TInput = TOutput>
       transformationMap as any
     );
   }
+
+  public asKey(): Schema<string | number, TInput> {
+    // This is a type-casting method. No runtime logic is needed.
+    return this as unknown as Schema<string | number, TInput>;
+  }
 }
 
 class ObjectSchema<

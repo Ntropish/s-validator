@@ -88,6 +88,7 @@ export type Plugin = {
 // The main map of all data types to their validator collections.
 export type SchemaValidatorMap = {
   [dataType: string]: {
+    identity: ValidatorFunction;
     [validatorName: string]: ValidatorFunction;
   };
 };

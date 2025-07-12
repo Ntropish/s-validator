@@ -31,48 +31,41 @@ const plugins: Plugin[] = [
   unknownPlugin,
 ];
 
-function mergePlugins(plugins: Plugin[]) {
-  const validatorMap: SchemaValidatorMap = {};
-  const preparationMap: Record<string, any> = {};
-  const transformationMap: Record<string, any> = {};
-  const messageMap: Record<string, any> = {};
+export const validatorMap: SchemaValidatorMap = {};
+export const preparationMap: Record<string, any> = {};
+export const transformationMap: Record<string, any> = {};
+export const messageMap: Record<string, any> = {};
 
-  for (const plugin of plugins) {
-    for (const dataType in plugin) {
-      if (!Object.prototype.hasOwnProperty.call(plugin, dataType)) continue;
+for (const plugin of plugins) {
+  for (const dataType in plugin) {
+    if (!Object.prototype.hasOwnProperty.call(plugin, dataType)) continue;
 
-      validatorMap[dataType] = validatorMap[dataType] || {};
-      preparationMap[dataType] = preparationMap[dataType] || {};
-      transformationMap[dataType] = transformationMap[dataType] || {};
-      messageMap[dataType] = messageMap[dataType] || {};
+    validatorMap[dataType] = validatorMap[dataType] || {
+      identity: (value: any) => false,
+    };
+    preparationMap[dataType] = preparationMap[dataType] || {};
+    transformationMap[dataType] = transformationMap[dataType] || {};
+    messageMap[dataType] = messageMap[dataType] || {};
 
-      for (const config of plugin[dataType]) {
-        if (config.prepare) {
-          Object.assign(preparationMap[dataType], config.prepare);
+    const definitions = plugin[dataType as keyof typeof plugin]!;
+    for (const def of definitions) {
+      if (def.prepare) {
+        for (const name in def.prepare) {
+          preparationMap[dataType][name] = def.prepare[name];
         }
-        if (config.transform) {
-          Object.assign(transformationMap[dataType], config.transform);
+      }
+      if (def.validate) {
+        for (const name in def.validate) {
+          const validatorDef = def.validate[name]!;
+          validatorMap[dataType][name] = validatorDef.validator;
+          messageMap[dataType][name] = validatorDef.message;
         }
-        if (config.validate) {
-          for (const validatorName in config.validate) {
-            if (
-              !Object.prototype.hasOwnProperty.call(
-                config.validate,
-                validatorName
-              )
-            )
-              continue;
-            const definition = config.validate[validatorName];
-            validatorMap[dataType][validatorName] = definition.validator;
-            messageMap[dataType][validatorName] = definition.message;
-          }
+      }
+      if (def.transform) {
+        for (const name in def.transform) {
+          transformationMap[dataType][name] = def.transform[name];
         }
       }
     }
   }
-
-  return { validatorMap, preparationMap, transformationMap, messageMap };
 }
-
-export const { validatorMap, preparationMap, transformationMap, messageMap } =
-  mergePlugins(plugins);
