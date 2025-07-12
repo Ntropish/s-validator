@@ -320,29 +320,26 @@ const objectPlugin = definePlugin({
   dataType: "object",
   validate: {
     identity: {
-      validator: async (value, args, context, schema) => {
-        if (typeof value !== "object" || value === null || Array.isArray(value)) {
-          return false;
-        }
-        const config = schema.config;
-        const properties = config.validate?.properties;
-        if (!properties) return true;
+      validator: (value) => {
+        return typeof value === "object" && value !== null && !Array.isArray(value);
+      },
+      message: (ctx) => `Invalid type. Expected object, received ${typeof ctx.value}.`
+    },
+    properties: {
+      validator: async (value, [shape], context, schema) => {
         const issues = [];
-        const allKeys = /* @__PURE__ */ new Set([
-          ...Object.keys(value),
-          ...Object.keys(properties)
-        ]);
+        const { strict } = schema.config;
+        const allKeys = /* @__PURE__ */ new Set([...Object.keys(value), ...Object.keys(shape)]);
         for (const key of allKeys) {
-          const schema2 = properties[key];
+          const propertySchema = shape[key];
           const propertyValue = value[key];
-          const childContext = {
+          const propertyContext = {
             ...context,
-            path: [...context.path, key],
-            value: propertyValue
+            path: [...context.path, key]
           };
-          if (schema2) {
+          if (propertySchema) {
             try {
-              await schema2.parse(propertyValue, childContext);
+              await propertySchema._validate(propertyValue, propertyContext);
             } catch (e) {
               if (e instanceof ValidationError) {
                 issues.push(...e.issues);
@@ -350,9 +347,9 @@ const objectPlugin = definePlugin({
                 throw e;
               }
             }
-          } else if (config.strict && Object.prototype.hasOwnProperty.call(value, key)) {
+          } else if (strict && Object.prototype.hasOwnProperty.call(value, key)) {
             issues.push({
-              path: childContext.path,
+              path: propertyContext.path,
               message: `Unrecognized key: '${key}'`
             });
           }
@@ -362,7 +359,30 @@ const objectPlugin = definePlugin({
         }
         return true;
       },
-      message: (ctx) => `Invalid type. Expected object, received ${typeof ctx.value}.`
+      message: () => `Object properties are invalid.`
+    }
+  },
+  transform: {
+    properties: async (value, [shape], context) => {
+      const transformedObject = { ...value };
+      for (const key in shape) {
+        if (Object.prototype.hasOwnProperty.call(value, key)) {
+          const propertySchema = shape[key];
+          const propertyValue = value[key];
+          const propertyContext = { ...context, path: [...context.path, key] };
+          transformedObject[key] = await propertySchema._transform(
+            propertyValue,
+            propertyContext
+          );
+        }
+      }
+      const finalObject = {};
+      for (const key of Object.keys(shape)) {
+        if (Object.prototype.hasOwnProperty.call(transformedObject, key)) {
+          finalObject[key] = transformedObject[key];
+        }
+      }
+      return finalObject;
     }
   }
 });
@@ -1038,34 +1058,85 @@ class Schema {
     const current_value = value;
     if (this.config.optional && current_value === void 0) return;
     if (this.config.nullable && current_value === null) return;
-    for (const { name, validator, args } of this.validators) {
-      if (!await validator(current_value, args, context, this)) {
-        const messageProducerContext = {
-          label: this.label,
-          value: current_value,
-          path: context.path,
-          dataType: this.dataType,
-          ctx: context.ctx,
-          args,
-          schema: this
-        };
-        let message;
-        const userMessage = messages[name];
-        if (typeof userMessage === "string") {
-          message = userMessage;
-        } else if (typeof userMessage === "function") {
-          message = userMessage(messageProducerContext);
-        } else {
-          const defaultMessageProducer = messageMap[this.dataType]?.[name];
-          if (defaultMessageProducer) {
-            message = defaultMessageProducer(messageProducerContext);
-          }
+    const identityValidator = this.validators.find(
+      (v) => v.name === "identity"
+    );
+    if (identityValidator && !await identityValidator.validator(
+      current_value,
+      identityValidator.args,
+      { ...context, value: current_value },
+      this
+    )) {
+      const messageProducerContext = {
+        label: this.label,
+        value: current_value,
+        path: context.path,
+        dataType: this.dataType,
+        ctx: context.ctx,
+        args: [],
+        schema: this
+      };
+      let message;
+      const userMessage = messages["identity"];
+      if (typeof userMessage === "string") {
+        message = userMessage;
+      } else if (typeof userMessage === "function") {
+        message = userMessage(messageProducerContext);
+      } else {
+        const defaultMessageProducer = messageMap[this.dataType]?.["identity"];
+        if (defaultMessageProducer) {
+          message = defaultMessageProducer(messageProducerContext);
         }
-        issues.push({
-          path: context.path,
-          message: message ?? `Validation failed for ${this.dataType}.${name}`
-        });
-        if (name === "identity") break;
+      }
+      issues.push({
+        path: context.path,
+        message: message ?? `Validation failed for ${this.dataType}.identity`
+      });
+      if (issues.length > 0) {
+        throw new ValidationError(issues);
+      }
+    }
+    for (const { name, validator, args } of this.validators) {
+      if (name === "identity") continue;
+      try {
+        if (!await validator(
+          current_value,
+          args,
+          { ...context, value: current_value },
+          this
+        )) {
+          const messageProducerContext = {
+            label: this.label,
+            value: current_value,
+            path: context.path,
+            dataType: this.dataType,
+            ctx: context.ctx,
+            args,
+            schema: this
+          };
+          let message;
+          const userMessage = messages[name];
+          if (typeof userMessage === "string") {
+            message = userMessage;
+          } else if (typeof userMessage === "function") {
+            message = userMessage(messageProducerContext);
+          } else {
+            const defaultMessageProducer = messageMap[this.dataType]?.[name];
+            if (defaultMessageProducer) {
+              message = defaultMessageProducer(messageProducerContext);
+            }
+          }
+          issues.push({
+            path: context.path,
+            message: message ?? `Validation failed for ${this.dataType}.${name}`
+          });
+        }
+      } catch (e) {
+        if (e instanceof ValidationError) {
+          issues.push(...e.issues);
+        } else {
+          throw e;
+        }
       }
     }
     for (const customValidator of this.customValidators) {

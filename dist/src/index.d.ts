@@ -12,6 +12,7 @@ type CustomValidator<T> = ((value: T, context: ValidationContext) => boolean | P
 type ValidatorConfig<VCollection> = {
     optional?: boolean;
     nullable?: boolean;
+    label?: string;
     messages?: Prettify<{
         [K in keyof Omit<VCollection, "identity" | "messages" | "preparations" | "transformations">]?: string;
     } & {

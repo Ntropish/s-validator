@@ -6,49 +6,40 @@ import {
   ValidationContext,
 } from "./types.js";
 
-export const objectPlugin = definePlugin<Record<string, any>>({
+export const objectPlugin = definePlugin({
   dataType: "object",
   validate: {
     identity: {
+      validator: (value: unknown): boolean => {
+        return (
+          typeof value === "object" && value !== null && !Array.isArray(value)
+        );
+      },
+      message: (ctx) =>
+        `Invalid type. Expected object, received ${typeof ctx.value}.`,
+    },
+    properties: {
       validator: async (
-        value: unknown,
-        args,
+        value: Record<string, any>,
+        [shape]: [Record<string, Schema<any, any>>],
         context: ValidationContext,
         schema: Schema<any, any>
       ): Promise<boolean> => {
-        if (
-          typeof value !== "object" ||
-          value === null ||
-          Array.isArray(value)
-        ) {
-          return false;
-        }
-
-        const config = schema.config as {
-          validate?: { properties?: Record<string, Schema<any, any>> };
-          strict?: boolean;
-        };
-        const properties = config.validate?.properties;
-        if (!properties) return true; // No properties to validate
-
         const issues: ValidationIssue[] = [];
-        const allKeys = new Set([
-          ...Object.keys(value),
-          ...Object.keys(properties),
-        ]);
+        const { strict } = schema.config as { strict?: boolean };
+        const allKeys = new Set([...Object.keys(value), ...Object.keys(shape)]);
 
         for (const key of allKeys) {
-          const schema = properties[key];
-          const propertyValue = (value as any)[key];
-          const childContext = {
+          const propertySchema = shape[key];
+          const propertyValue = value[key];
+          const propertyContext = {
             ...context,
             path: [...context.path, key],
-            value: propertyValue,
           };
 
-          if (schema) {
+          if (propertySchema) {
             try {
-              await schema.parse(propertyValue, childContext);
+              await propertySchema._validate(propertyValue, propertyContext);
             } catch (e) {
               if (e instanceof ValidationError) {
                 issues.push(...e.issues);
@@ -57,11 +48,11 @@ export const objectPlugin = definePlugin<Record<string, any>>({
               }
             }
           } else if (
-            config.strict &&
+            strict &&
             Object.prototype.hasOwnProperty.call(value, key)
           ) {
             issues.push({
-              path: childContext.path,
+              path: propertyContext.path,
               message: `Unrecognized key: '${key}'`,
             });
           }
@@ -73,8 +64,35 @@ export const objectPlugin = definePlugin<Record<string, any>>({
 
         return true;
       },
-      message: (ctx) =>
-        `Invalid type. Expected object, received ${typeof ctx.value}.`,
+      message: () => `Object properties are invalid.`,
+    },
+  },
+  transform: {
+    properties: async (
+      value: Record<string, any>,
+      [shape]: [Record<string, Schema<any, any>>],
+      context: ValidationContext
+    ): Promise<Record<string, any>> => {
+      const transformedObject: Record<string, any> = { ...value };
+      for (const key in shape) {
+        if (Object.prototype.hasOwnProperty.call(value, key)) {
+          const propertySchema = shape[key];
+          const propertyValue = value[key];
+          const propertyContext = { ...context, path: [...context.path, key] };
+          transformedObject[key] = await propertySchema._transform(
+            propertyValue,
+            propertyContext
+          );
+        }
+      }
+      // Return a new object with only the defined properties
+      const finalObject: Record<string, any> = {};
+      for (const key of Object.keys(shape)) {
+        if (Object.prototype.hasOwnProperty.call(transformedObject, key)) {
+          finalObject[key] = transformedObject[key];
+        }
+      }
+      return finalObject;
     },
   },
 });
