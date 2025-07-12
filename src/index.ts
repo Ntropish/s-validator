@@ -1,4 +1,5 @@
 import { validatorMap } from "./validator-map.js";
+import { StandardSchemaV1 } from "./standard-schema.js";
 import {
   ValidatorFunction,
   ValidationContext,
@@ -60,7 +61,7 @@ function isValidationContext(thing: any): thing is ValidationContext {
   );
 }
 
-export class Schema<T> {
+export class Schema<T> implements StandardSchemaV1<T, T> {
   private validators: Array<{
     name: string;
     validator: ValidatorFunction<T>;
@@ -68,6 +69,7 @@ export class Schema<T> {
   }> = [];
   private dataType: string;
   public config: Record<string, unknown>;
+  public readonly "~standard": StandardSchemaV1.Props<T, T>;
 
   constructor(
     dataType: string,
@@ -101,6 +103,25 @@ export class Schema<T> {
         });
       }
     }
+
+    this["~standard"] = {
+      version: 1,
+      vendor: "s-val",
+      validate: async (value: unknown): Promise<StandardSchemaV1.Result<T>> => {
+        const result = await this.safeParse(value as T);
+        if (result.status === "success") {
+          return { value: result.data };
+        }
+        const issues: StandardSchemaV1.Issue[] = result.error.issues.map(
+          (issue) => ({
+            message: issue.message,
+            path: issue.path.map((key) => ({ key })),
+          })
+        );
+        return { issues };
+      },
+      types: {} as StandardSchemaV1.Types<T, T>,
+    };
   }
 
   public async parse(data: T): Promise<T>;

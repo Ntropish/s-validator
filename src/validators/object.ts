@@ -34,7 +34,7 @@ export const objectValidatorMap = {
         });
 
         if (result.status === "error") {
-          return false;
+          throw result.error;
         }
       }
 

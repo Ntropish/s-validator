@@ -25,7 +25,7 @@ export const arrayValidatorMap = {
           value: item,
         });
         if (result.status === "error") {
-          return false;
+          throw result.error;
         }
       }
       return true;
@@ -42,7 +42,7 @@ export const arrayValidatorMap = {
           value: value[i],
         });
         if (result.status === "error") {
-          return false;
+          throw result.error;
         }
       }
       return true;
