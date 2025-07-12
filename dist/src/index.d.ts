@@ -5,6 +5,14 @@ import { SwitchConfig } from './validators/switch.js';
 type Prettify<T> = {
     [K in keyof T]: T[K];
 } & {};
+type UndefinedKeys<T> = {
+    [K in keyof T]: undefined extends T[K] ? K : never;
+}[keyof T];
+type UndefinedToOptional<T> = Prettify<{
+    [K in Exclude<keyof T, UndefinedKeys<T>>]: T[K];
+} & {
+    [K in UndefinedKeys<T>]?: T[K];
+}>;
 type CustomValidator<T> = ((value: T, context: ValidationContext) => boolean | Promise<boolean>) | {
     validator: (value: T, context: ValidationContext) => boolean | Promise<boolean>;
     message?: string;
@@ -28,6 +36,7 @@ type ValidatorConfig<VCollection> = {
         custom?: ((value: any) => any)[];
     };
 };
+type InferSchemaType<T extends Schema<any, any>> = T extends Schema<infer U, any> ? U : never;
 export declare class Schema<TOutput, TInput = TOutput> implements StandardSchemaV1<TInput, TOutput> {
     protected validators: Array<{
         name: string;
@@ -61,11 +70,32 @@ export declare class Schema<TOutput, TInput = TOutput> implements StandardSchema
     nullable(): Schema<TOutput | null, TInput | null>;
     asKey(): Schema<string | number, TInput>;
 }
+type SObjectProperties = Record<string, Schema<any, any>>;
+type InferSObjectType<P extends SObjectProperties> = Prettify<UndefinedToOptional<{
+    [K in keyof P]: InferSchemaType<P[K]>;
+}>>;
+declare class ObjectSchema<P extends SObjectProperties, T = InferSObjectType<P>> extends Schema<T> {
+    constructor(config: ValidatorConfig<any> & {
+        validate?: {
+            properties?: P;
+        };
+    });
+    private getProperties;
+    partial(): ObjectSchema<P, Partial<T>>;
+    pick<K extends keyof P & keyof T>(keys: K[]): ObjectSchema<Pick<P, K>, Pick<T, K>>;
+    omit<K extends keyof P>(keys: K[]): ObjectSchema<Omit<P, K>, Omit<T, K>>;
+    extend<E extends SObjectProperties>(extension: E): ObjectSchema<P & E, T & InferSObjectType<E>>;
+}
 type Builder = {
     [P in Exclude<(typeof plugins)[number], {
-        dataType: "switch";
+        dataType: "switch" | "object";
     }> as P["dataType"]]: (config?: ValidatorConfig<any>) => Schema<P extends SValidator<infer TOutput, any> ? TOutput : never, P extends SValidator<any, infer TInput> ? TInput : never>;
 } & {
+    object<P extends SObjectProperties>(config: ValidatorConfig<any> & {
+        validate?: {
+            properties?: P;
+        };
+    }): ObjectSchema<P, InferSObjectType<P>>;
     switch(config: SwitchConfig): Schema<any>;
 };
 export declare const s: Builder;

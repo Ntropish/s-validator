@@ -1231,10 +1231,82 @@ class Schema {
     return this;
   }
 }
+class ObjectSchema extends Schema {
+  constructor(config) {
+    super("object", config);
+  }
+  getProperties() {
+    const config = this.config;
+    return config.validate?.properties ?? {};
+  }
+  partial() {
+    const originalProperties = this.getProperties();
+    const newProperties = {};
+    for (const key in originalProperties) {
+      newProperties[key] = originalProperties[key].optional();
+    }
+    const newConfig = {
+      ...this.config,
+      validate: {
+        ...this.config.validate,
+        properties: newProperties
+      }
+    };
+    return new ObjectSchema(newConfig);
+  }
+  pick(keys) {
+    const originalProperties = this.getProperties();
+    const newProperties = {};
+    for (const key of keys) {
+      if (originalProperties[key]) {
+        newProperties[key] = originalProperties[key];
+      }
+    }
+    const newConfig = {
+      ...this.config,
+      validate: {
+        ...this.config.validate,
+        properties: newProperties
+      }
+    };
+    return new ObjectSchema(newConfig);
+  }
+  omit(keys) {
+    const originalProperties = this.getProperties();
+    const newProperties = { ...originalProperties };
+    for (const key of keys) {
+      delete newProperties[key];
+    }
+    const newConfig = {
+      ...this.config,
+      validate: {
+        ...this.config.validate,
+        properties: newProperties
+      }
+    };
+    return new ObjectSchema(newConfig);
+  }
+  extend(extension) {
+    const originalProperties = this.getProperties();
+    const newProperties = { ...originalProperties, ...extension };
+    const newConfig = {
+      ...this.config,
+      validate: {
+        ...this.config.validate,
+        properties: newProperties
+      }
+    };
+    return new ObjectSchema(newConfig);
+  }
+}
 function createSchemaBuilder() {
   const builder = {};
   for (const plugin of plugins) {
     if (plugin.dataType === "switch") continue;
+    if (plugin.dataType === "object") {
+      builder.object = (config) => new ObjectSchema(config);
+      continue;
+    }
     builder[plugin.dataType] = (config) => {
       return new Schema(plugin.dataType, config);
     };

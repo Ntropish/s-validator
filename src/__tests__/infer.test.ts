@@ -25,7 +25,9 @@ describe("s.infer", () => {
     expect(dateData).toBeInstanceOf(Date);
 
     const objectSchema = s.object({
-      properties: { name: s.string(), age: s.number() },
+      validate: {
+        properties: { name: s.string(), age: s.number() },
+      },
     });
     type ObjectType = s.infer<typeof objectSchema>;
     const objectData: ObjectType = { name: "test", age: 30 };
@@ -36,7 +38,11 @@ describe("s.infer", () => {
     const arrayData: ArrayType = ["a", "b"];
     expect(Array.isArray(arrayData)).toBe(true);
 
-    const unionSchema = s.union([s.string(), s.number()]);
+    const unionSchema = s.union({
+      validate: {
+        ofType: [s.string(), s.number()],
+      },
+    });
     type UnionType = s.infer<typeof unionSchema>;
     const unionData1: UnionType = "string";
     const unionData2: UnionType = 123;

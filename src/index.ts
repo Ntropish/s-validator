@@ -460,10 +460,102 @@ export class Schema<TOutput, TInput = TOutput>
   }
 }
 
+type SObjectProperties = Record<string, Schema<any, any>>;
+type InferSObjectType<P extends SObjectProperties> = Prettify<
+  UndefinedToOptional<{
+    [K in keyof P]: InferSchemaType<P[K]>;
+  }>
+>;
+
+class ObjectSchema<
+  P extends SObjectProperties,
+  T = InferSObjectType<P>
+> extends Schema<T> {
+  constructor(
+    config: ValidatorConfig<any> & { validate?: { properties?: P } }
+  ) {
+    super("object", config);
+  }
+
+  private getProperties(): P {
+    const config = this.config as { validate?: { properties?: P } };
+    return config.validate?.properties ?? ({} as P);
+  }
+
+  public partial(): ObjectSchema<P, Partial<T>> {
+    const originalProperties = this.getProperties();
+    const newProperties: { [K in keyof P]?: Schema<any, any> } = {};
+    for (const key in originalProperties) {
+      newProperties[key] = originalProperties[key].optional();
+    }
+    const newConfig = {
+      ...this.config,
+      validate: {
+        ...(this.config.validate as Record<string, unknown>),
+        properties: newProperties as P,
+      },
+    };
+    return new ObjectSchema(newConfig as any);
+  }
+
+  public pick<K extends keyof P & keyof T>(
+    keys: K[]
+  ): ObjectSchema<Pick<P, K>, Pick<T, K>> {
+    const originalProperties = this.getProperties();
+    const newProperties: Partial<Pick<P, K>> = {};
+    for (const key of keys) {
+      if (originalProperties[key]) {
+        newProperties[key] = originalProperties[key];
+      }
+    }
+    const newConfig = {
+      ...this.config,
+      validate: {
+        ...(this.config.validate as Record<string, unknown>),
+        properties: newProperties as Pick<P, K>,
+      },
+    };
+    return new ObjectSchema(newConfig as any);
+  }
+
+  public omit<K extends keyof P>(
+    keys: K[]
+  ): ObjectSchema<Omit<P, K>, Omit<T, K>> {
+    const originalProperties = this.getProperties();
+    const newProperties = { ...originalProperties };
+    for (const key of keys) {
+      delete (newProperties as any)[key];
+    }
+    const newConfig = {
+      ...this.config,
+      validate: {
+        ...(this.config.validate as Record<string, unknown>),
+        properties: newProperties as Omit<P, K>,
+      },
+    };
+    return new ObjectSchema(newConfig as any);
+  }
+
+  public extend<E extends SObjectProperties>(
+    extension: E
+  ): ObjectSchema<P & E, T & InferSObjectType<E>> {
+    const originalProperties = this.getProperties();
+    const newProperties = { ...originalProperties, ...extension };
+    const newConfig = {
+      ...this.config,
+      validate: {
+        ...(this.config.validate as Record<string, unknown>),
+        properties: newProperties,
+      },
+    };
+    return new ObjectSchema(newConfig as any);
+  }
+}
+
 type Builder = {
   [P in Exclude<
     (typeof plugins)[number],
-    { dataType: "switch" }
+    { dataType: "switch" | "object" }
   > as P["dataType"]]: (
     config?: ValidatorConfig<any>
   ) => Schema<
@@ -471,6 +563,9 @@ type Builder = {
     P extends SValidator<any, infer TInput> ? TInput : never
   >;
 } & {
+  object<P extends SObjectProperties>(
+    config: ValidatorConfig<any> & { validate?: { properties?: P } }
+  ): ObjectSchema<P, InferSObjectType<P>>;
   switch(config: SwitchConfig): Schema<any>;
 };
 
@@ -479,6 +574,12 @@ function createSchemaBuilder(): Builder {
 
   for (const plugin of plugins) {
     if (plugin.dataType === "switch") continue;
+    if (plugin.dataType === "object") {
+      builder.object = <P extends SObjectProperties>(
+        config: ValidatorConfig<any> & { validate?: { properties?: P } }
+      ) => new ObjectSchema<P, InferSObjectType<P>>(config);
+      continue;
+    }
     builder[plugin.dataType] = (config?: ValidatorConfig<any>) => {
       return new Schema(plugin.dataType, config);
     };

@@ -7,9 +7,11 @@ describe("json validator", () => {
     const schema = s.string({
       validate: {
         json: s.object({
-          properties: {
-            name: s.string(),
-            age: s.number(),
+          validate: {
+            properties: {
+              name: s.string(),
+              age: s.number(),
+            },
           },
         }),
       },
@@ -23,9 +25,11 @@ describe("json validator", () => {
     const schema = s.string({
       validate: {
         json: s.object({
-          properties: {
-            name: s.string(),
-            age: s.number(),
+          validate: {
+            properties: {
+              name: s.string(),
+              age: s.number(),
+            },
           },
         }),
       },
@@ -39,8 +43,10 @@ describe("json validator", () => {
     const schema = s.string({
       validate: {
         json: s.object({
-          properties: {
-            name: s.string(),
+          validate: {
+            properties: {
+              name: s.string(),
+            },
           },
         }),
       },
@@ -54,8 +60,10 @@ describe("json validator", () => {
     const schema = s.string({
       validate: {
         json: s.object({
-          properties: {
-            name: s.string(),
+          validate: {
+            properties: {
+              name: s.string(),
+            },
           },
         }),
       },
@@ -69,17 +77,23 @@ describe("json validator", () => {
     const schema = s.string({
       validate: {
         json: s.object({
-          properties: {
-            user: s.object({
-              properties: {
-                name: s.string(),
-                details: s.object({
+          validate: {
+            properties: {
+              user: s.object({
+                validate: {
                   properties: {
-                    tags: s.array({ validate: { ofType: s.string() } }),
+                    name: s.string(),
+                    details: s.object({
+                      validate: {
+                        properties: {
+                          tags: s.array({ validate: { ofType: s.string() } }),
+                        },
+                      },
+                    }),
                   },
-                }),
-              },
-            }),
+                },
+              }),
+            },
           },
         }),
       },

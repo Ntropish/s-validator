@@ -4,9 +4,11 @@ import { ValidationError } from "../validators/types.js";
 
 describe("Object Modifiers", () => {
   const baseSchema = s.object({
-    properties: {
-      name: s.string({ validate: { minLength: 1 } }),
-      age: s.number(),
+    validate: {
+      properties: {
+        name: s.string({ validate: { minLength: 1 } }),
+        age: s.number(),
+      },
     },
   });
 
@@ -46,10 +48,12 @@ describe("Object Modifiers", () => {
 
   describe("pick", () => {
     const baseSchema = s.object({
-      properties: {
-        name: s.string(),
-        age: s.number(),
-        email: s.string({ validate: { email: true } }),
+      validate: {
+        properties: {
+          name: s.string(),
+          age: s.number(),
+          email: s.string({ validate: { email: true } }),
+        },
       },
     });
 
@@ -87,10 +91,12 @@ describe("Object Modifiers", () => {
   });
   describe("omit", () => {
     const baseSchema = s.object({
-      properties: {
-        name: s.string(),
-        age: s.number(),
-        email: s.string({ validate: { email: true } }),
+      validate: {
+        properties: {
+          name: s.string(),
+          age: s.number(),
+          email: s.string({ validate: { email: true } }),
+        },
       },
     });
 
@@ -132,8 +138,10 @@ describe("Object Modifiers", () => {
 
   describe("extend", () => {
     const baseSchema = s.object({
-      properties: {
-        name: s.string(),
+      validate: {
+        properties: {
+          name: s.string(),
+        },
       },
     });
 
@@ -154,15 +162,15 @@ describe("Object Modifiers", () => {
     });
 
     it("should not affect the original schema", async () => {
-      baseSchema.extend({ age: s.number() });
+      const newSchema = baseSchema.extend({ age: s.number() });
       // original schema should still pass with just a name
-      await expect(baseSchema.parse({ name: "test" })).resolves.toEqual({
+      await expect(newSchema.parse({ name: "test" })).resolves.toEqual({
         name: "test",
       });
       // original schema should ignore extra properties because it is not strict
-      await expect(
-        baseSchema.parse({ name: "John", age: 30 })
-      ).resolves.toEqual({ name: "John", age: 30 });
+      await expect(newSchema.parse({ name: "John", age: 30 })).resolves.toEqual(
+        { name: "John", age: 30 }
+      );
     });
 
     it("should correctly validate the extended schema", async () => {

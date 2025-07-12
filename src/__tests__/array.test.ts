@@ -131,9 +131,11 @@ describe("Array Validators", () => {
   describe("Complex Nested Arrays", () => {
     it("should validate an array of user objects where each user has an array of tags", async () => {
       const userSchema = s.object({
-        properties: {
-          name: s.string(),
-          tags: s.array({ validate: { ofType: s.string() } }),
+        validate: {
+          properties: {
+            name: s.string(),
+            tags: s.array({ validate: { ofType: s.string() } }),
+          },
         },
       });
       const schema = s.array({ validate: { ofType: userSchema } });
@@ -169,15 +171,19 @@ describe("Array Validators", () => {
 
     it("should validate a list of products with nested feature arrays", async () => {
       const featureSchema = s.object({
-        properties: {
-          id: s.string(),
-          value: s.string(),
+        validate: {
+          properties: {
+            id: s.string(),
+            value: s.string(),
+          },
         },
       });
       const productSchema = s.object({
-        properties: {
-          name: s.string(),
-          features: s.array({ validate: { ofType: featureSchema } }),
+        validate: {
+          properties: {
+            name: s.string(),
+            features: s.array({ validate: { ofType: featureSchema } }),
+          },
         },
       });
       const schema = s.array({ validate: { ofType: productSchema } });

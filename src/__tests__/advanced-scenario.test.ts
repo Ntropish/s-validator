@@ -3,66 +3,68 @@ import { s } from "../index.js";
 
 describe("Advanced Scenario", () => {
   const advancedSchema = s.object({
-    properties: {
-      // String with preparations, validations, and transformations
-      username: s.string({
-        prepare: {
-          custom: [
-            (v: unknown) => (typeof v === "string" ? v.toLowerCase() : v),
-          ],
-        },
-        validate: {
-          minLength: 3,
-        },
-        transform: {
-          custom: [(v: string) => `@${v}`],
-        },
-      }),
-
-      // Email with coercion and validation
-      email: s.string({
-        prepare: {
-          trim: true,
-          toLowerCase: true,
-        },
-        validate: {
-          email: true,
-        },
-      }),
-
-      // Number with coercion
-      age: s.number({
-        prepare: {
-          coerce: true, // from string to number
-        },
-        validate: {
-          min: 18,
-        },
-      }),
-
-      // Boolean with coercion
-      isSubscribed: s.boolean({
-        prepare: {
-          coerce: true, // from "true" or 1
-        },
-      }),
-
-      // Array of objects
-      posts: s.array({
-        validate: {
-          ofType: s.object({
-            properties: {
-              title: s.string({ validate: { minLength: 5 } }),
-              content: s.string(),
-              // A date that can be from a string
-              createdAt: s.date({ prepare: { coerce: true } }),
-            },
-          }),
-          minLength: 1,
-        },
-      }),
-    },
     validate: {
+      properties: {
+        // String with preparations, validations, and transformations
+        username: s.string({
+          prepare: {
+            custom: [
+              (v: unknown) => (typeof v === "string" ? v.toLowerCase() : v),
+            ],
+          },
+          validate: {
+            minLength: 3,
+          },
+          transform: {
+            custom: [(v: string) => `@${v}`],
+          },
+        }),
+
+        // Email with coercion and validation
+        email: s.string({
+          prepare: {
+            trim: true,
+            toLowerCase: true,
+          },
+          validate: {
+            email: true,
+          },
+        }),
+
+        // Number with coercion
+        age: s.number({
+          prepare: {
+            coerce: true, // from string to number
+          },
+          validate: {
+            min: 18,
+          },
+        }),
+
+        // Boolean with coercion
+        isSubscribed: s.boolean({
+          prepare: {
+            coerce: true, // from "true" or 1
+          },
+        }),
+
+        // Array of objects
+        posts: s.array({
+          validate: {
+            ofType: s.object({
+              validate: {
+                properties: {
+                  title: s.string({ validate: { minLength: 5 } }),
+                  content: s.string(),
+                  // A date that can be from a string
+                  createdAt: s.date({ prepare: { coerce: true } }),
+                },
+              },
+            }),
+            minLength: 1,
+          },
+        }),
+      },
       custom: [
         {
           validator: (v: any) => {

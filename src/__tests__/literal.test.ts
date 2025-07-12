@@ -48,9 +48,11 @@ describe("Literal Validator", () => {
 
   it("should be usable in object schemas", async () => {
     const schema = s.object({
-      properties: {
-        type: s.literal({ validate: { identity: "user" } }),
-        name: s.string(),
+      validate: {
+        properties: {
+          type: s.literal({ validate: { identity: "user" } }),
+          name: s.string(),
+        },
       },
     });
     const data = { type: "user" as const, name: "John" };
@@ -59,9 +61,11 @@ describe("Literal Validator", () => {
 
   it("should throw in object schemas for incorrect literal", async () => {
     const schema = s.object({
-      properties: {
-        type: s.literal({ validate: { identity: "user" } }),
-        name: s.string(),
+      validate: {
+        properties: {
+          type: s.literal({ validate: { identity: "user" } }),
+          name: s.string(),
+        },
       },
     });
     const data = { type: "admin" as const, name: "John" };

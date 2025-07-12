@@ -5,9 +5,11 @@ describe("Modifiers", () => {
   describe("optional", () => {
     it("should allow an optional property to be missing", async () => {
       const schema = s.object({
-        properties: {
-          required: s.string(),
-          optional: s.string({ optional: true }),
+        validate: {
+          properties: {
+            required: s.string(),
+            optional: s.string({ optional: true }),
+          },
         },
       });
       const data = { required: "hello" };
@@ -16,8 +18,13 @@ describe("Modifiers", () => {
 
     it("should still validate an optional property if it is present", async () => {
       const schema = s.object({
-        properties: {
-          optional: s.string({ minLength: 5, optional: true }),
+        validate: {
+          properties: {
+            optional: s.string({
+              validate: { minLength: 5 },
+              optional: true,
+            }),
+          },
         },
       });
       // This should pass
@@ -31,8 +38,10 @@ describe("Modifiers", () => {
 
     it("should fail if a required property is missing", async () => {
       const schema = s.object({
-        properties: {
-          required: s.string(),
+        validate: {
+          properties: {
+            required: s.string(),
+          },
         },
       });
       const data = {}; // Missing 'required' property
@@ -52,7 +61,10 @@ describe("Modifiers", () => {
     });
 
     it("should still validate a nullable property if it is not null", async () => {
-      const schema = s.string({ minLength: 5, nullable: true });
+      const schema = s.string({
+        validate: { minLength: 5 },
+        nullable: true,
+      });
       // This should pass
       await expect(schema.parse("longenough")).resolves.toBe("longenough");
       // This should fail
@@ -68,7 +80,11 @@ describe("Modifiers", () => {
     });
 
     it("should correctly validate a chained property that has a value", async () => {
-      const schema = s.string({ minLength: 5, optional: true, nullable: true });
+      const schema = s.string({
+        validate: { minLength: 5 },
+        optional: true,
+        nullable: true,
+      });
       // This should pass
       await expect(schema.parse("longenough")).resolves.toBe("longenough");
       // This should fail
