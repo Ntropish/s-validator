@@ -5,12 +5,12 @@ export default defineConfig({
   build: {
     lib: {
       entry: "src/index.ts",
-      name: "ToneTool",
+      name: "SVal",
       fileName: "index",
       formats: ["es", "cjs"],
     },
     rollupOptions: {
-      external: ["vite", "@preact/signals-core"],
+      external: ["vite"],
     },
     target: "esnext",
     minify: false,

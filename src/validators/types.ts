@@ -35,4 +35,31 @@ export type SchemaValidatorMap = {
   [dataType: string]: ValidatorCollection<any>;
 };
 
+export type ValidationIssue = {
+  path: readonly (string | number)[];
+  message: string;
+};
+
+export class ValidationError extends Error {
+  public issues: ValidationIssue[];
+
+  constructor(issues: ValidationIssue[]) {
+    super(issues[0]?.message || "Validation failed");
+    this.issues = issues;
+    this.name = "ValidationError";
+  }
+}
+
+export type SafeParseSuccess<T> = {
+  success: true;
+  data: T;
+};
+
+export type SafeParseError = {
+  success: false;
+  error: ValidationError;
+};
+
+export type SafeParseResult<T> = SafeParseSuccess<T> | SafeParseError;
+
 export { Schema };

@@ -3,6 +3,11 @@ import {
   ValidatorFunction,
   ValidationContext,
   SchemaValidatorMap,
+  ValidationIssue,
+  ValidationError,
+  SafeParseResult,
+  SafeParseError,
+  SafeParseSuccess,
 } from "./validators/types.js";
 
 // A utility to force TS to expand a type in tooltips for better DX.
@@ -108,6 +113,24 @@ export class Schema<T> {
     return this._parse(context);
   }
 
+  public safeParse(data: T): SafeParseResult<T>;
+  public safeParse(context: ValidationContext): SafeParseResult<T>;
+  public safeParse(dataOrContext: T | ValidationContext): SafeParseResult<T> {
+    const context: ValidationContext = isValidationContext(dataOrContext)
+      ? dataOrContext
+      : { rootData: dataOrContext, path: [], value: dataOrContext };
+
+    try {
+      const data = this._parse(context);
+      return { success: true, data }; // ⬅ no cast needed
+    } catch (e) {
+      if (e instanceof ValidationError) {
+        return { success: false, error: e }; // ⬅ no cast needed
+      }
+      throw e;
+    }
+  }
+
   protected _parse(context: ValidationContext): T {
     if (this.config.optional && context.value === undefined) {
       return context.value;
@@ -116,23 +139,37 @@ export class Schema<T> {
       return context.value;
     }
 
+    const issues: ValidationIssue[] = [];
+
     for (const { name, validator, args } of this.validators) {
       if (!validator(context.value, args, context)) {
         const path = context.path.join(".");
         const messages = this.config.messages as
           | { [key: string]: string }
           | undefined;
-        const customMessage = messages?.[name];
+        let message = messages?.[name];
 
-        if (customMessage) {
-          throw new Error(customMessage);
+        if (!message) {
+          if (name === "identity") {
+            message = `Invalid type. Expected ${
+              this.dataType
+            }, received ${typeof context.value}. Path: '${path}'`;
+          } else {
+            message = `Validation failed for ${this.dataType}.${name} at path '${path}'`;
+          }
         }
 
-        throw new Error(
-          `Validation failed for ${this.dataType}.${name} at path '${path}'`
-        );
+        issues.push({
+          path: context.path,
+          message,
+        });
       }
     }
+
+    if (issues.length > 0) {
+      throw new ValidationError(issues);
+    }
+
     return context.value;
   }
 }
