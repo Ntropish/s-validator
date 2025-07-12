@@ -16,7 +16,6 @@ import { unknownPlugin } from "./validators/unknown.js";
 import { literalPlugin } from "./validators/literal.js";
 import { unionPlugin } from "./validators/union.js";
 import { recordPlugin } from "./validators/record.js";
-import { switchPlugin } from "./validators/switch.js";
 
 export const plugins: Validator<any, any>[] = [
   anyPlugin,
@@ -34,7 +33,6 @@ export const plugins: Validator<any, any>[] = [
   recordPlugin,
   setPlugin,
   stringPlugin,
-  switchPlugin,
   unionPlugin,
   unknownPlugin,
 ];

@@ -668,6 +668,33 @@ class ObjectSchema<
   }
 }
 
+class SwitchSchema extends Schema<any> {
+  constructor(config: SwitchConfig) {
+    super("switch", config);
+  }
+
+  async _validate(value: any, context: ValidationContext): Promise<any> {
+    const {
+      select,
+      cases,
+      default: defaultSchema,
+    } = this.config as SwitchConfig;
+
+    if (!select || !cases) {
+      return value;
+    }
+
+    const key = select({ ...context, value });
+    const caseSchema = cases[key] || defaultSchema;
+
+    if (caseSchema) {
+      return await caseSchema.parse(value, context);
+    }
+
+    return value;
+  }
+}
+
 type Builder = {
   [P in Exclude<
     (typeof plugins)[number],
@@ -757,7 +784,7 @@ function createSchemaBuilder(): Builder {
   }
 
   builder.switch = (config: SwitchConfig) => {
-    return new Schema("switch", config as any);
+    return new SwitchSchema(config);
   };
 
   return builder as Builder;
