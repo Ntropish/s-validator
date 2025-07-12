@@ -15,8 +15,8 @@ class AnotherClass {}
 const schema = s.instanceof(TestClass);
 
 const instance = new TestClass();
-schema.parse(instance); // ✅
+await schema.parse(instance); // ✅
 
 const anotherInstance = new AnotherClass();
-schema.parse(anotherInstance); // ❌
+await schema.parse(anotherInstance); // ❌
 ```

@@ -21,19 +21,25 @@ const eventSchema = s.switch(
   (ctx) => ctx.value.type, // 1. The key function
   {
     // 2. The schemas map
-    click: s.object().properties({
-      type: s.string().oneOf(["click"]),
-      x: s.number(),
-      y: s.number(),
+    click: s.object({
+      properties: {
+        type: s.literal("click"),
+        x: s.number(),
+        y: s.number(),
+      },
     }),
-    keypress: s.object().properties({
-      type: s.string().oneOf(["keypress"]),
-      key: s.string(),
+    keypress: s.object({
+      properties: {
+        type: s.literal("keypress"),
+        key: s.string(),
+      },
     }),
   },
   // 3. Optional default schema
-  s.object().properties({
-    type: s.string(),
+  s.object({
+    properties: {
+      type: s.string(),
+    },
   })
 );
 

@@ -9,14 +9,15 @@ import { s } from "s-val";
 
 const schema = s.unknown();
 
-schema.parse(123); // ✅
-schema.parse("hello"); // ✅
-schema.parse(null); // ✅
+await schema.parse(123); // ✅
+await schema.parse("hello"); // ✅
+await schema.parse(null); // ✅
 
-const validated = await schema.parse({ a: 1 });
+const validated: unknown = await schema.parse({ a: 1 });
 
+// You must perform type checking before you can use the value
 if (typeof validated === "object" && validated !== null && "a" in validated) {
   // This is safe because of the type check
-  console.log(validated.a);
+  // At this point, `validated` is narrowed to a type with an 'a' property
 }
 ```

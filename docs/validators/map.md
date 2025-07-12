@@ -16,11 +16,11 @@ const map = new Map([
   ["b", 2],
 ]);
 
-schema.parse(map); // ✅
+await schema.parse(map); // ✅
 
 const invalidMap = new Map([
   ["a", "1"], // Value should be a number
 ]);
 
-schema.parse(invalidMap); // ❌
+await schema.parse(invalidMap); // ❌
 ```

@@ -85,11 +85,11 @@ if (result2.status === "error") {
 
 ## Modifiers
 
-You can modify any schema to allow for `undefined` or `null` values.
+You can modify any schema to allow for `undefined` or `null` values using the `optional` and `nullable` configuration properties.
 
-### `.optional()`
+### `optional`
 
-To allow a value to be `undefined`, chain `.optional()` to its schema definition. In an object, this means the property can be missing entirely.
+To allow a value to be `undefined`, set `optional: true` in its schema definition. In an object, this means the property can be missing entirely.
 
 ```typescript
 const schema = s.object({
@@ -104,9 +104,9 @@ await schema.parse({ name: "John" });
 await schema.parse({ name: "John", bio: "A developer." });
 ```
 
-### `.nullable()`
+### `nullable`
 
-To allow a value to be `null`, chain `.nullable()` to its schema definition.
+To allow a value to be `null`, set `nullable: true` in its schema definition.
 
 ```typescript
 const schema = s.object({
@@ -145,8 +145,8 @@ const userSchema = s.object({
   properties: {
     name: s.string(),
     age: s.number(),
-    isAdmin: s.boolean().optional(),
-    tags: s.array().ofType(s.string()).nullable(),
+    isAdmin: s.boolean({ optional: true }),
+    tags: s.array({ of: s.string(), nullable: true }),
   },
 });
 
@@ -157,7 +157,7 @@ type User = s.infer<typeof userSchema>;
 // {
 //   name: string;
 //   age: number;
-//   isAdmin?: boolean | undefined;
+//   isAdmin?: boolean;
 //   tags: string[] | null;
 // }
 

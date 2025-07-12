@@ -1,169 +1,137 @@
 # Number Validator
 
-The `number` validator checks if a value is a number. It provides several methods for more specific numeric validations.
+The `number` validator checks if a value is a number. It provides several properties for more specific numeric validations.
 
 ## Usage
+
+You can pass a configuration object to `s.number()` to specify validation rules.
 
 ```typescript
 import { s } from "s-val";
 
-const schema = s.number();
+// Check for a number that is an integer and at least 18
+const schema = s.number({
+  integer: true,
+  min: 18,
+});
 
-schema.parse(123); // ✅
-schema.parse(12.3); // ✅
-schema.parse("123"); // ❌
+await schema.parse(25); // ✅
+await schema.parse(18); // ✅
+await schema.parse(25.5); // ❌ (not an integer)
+await schema.parse(17); // ❌ (less than 18)
 ```
 
-## Methods
+## Validation Properties
 
-### `.min(value: number)`
+All validation rules are passed inside the configuration object.
 
-Checks if the number is greater than or equal to `value`.
+- `min: number`: Checks if the number is greater than or equal to the value.
+- `max: number`: Checks if the number is less than or equal to the value.
+- `gt: number`: Checks if the number is strictly greater than the value.
+- `gte: number`: Checks if the number is greater than or equal to the value (alias for `min`).
+- `lt: number`: Checks if the number is strictly less than the value.
+- `lte: number`: Checks if the number is less than or equal to the value (alias for `max`).
+- `range: [min: number, max: number]`: Checks if the number is within an inclusive range.
+- `exclusiveRange: [min: number, max: number]`: Checks if the number is within an exclusive range.
+- `integer: boolean`: Checks if the number is an integer.
+- `positive: boolean`: Checks if the number is positive (> 0).
+- `negative: boolean`: Checks if the number is negative (< 0).
+- `zero: boolean`: Checks if the number is exactly 0.
+- `float: boolean`: Checks if the number is a float (i.e., not an integer).
+- `multipleOf: number`: Checks if the number is a multiple of the value.
+- `even: boolean`: Checks if the number is even.
+- `odd: boolean`: Checks if the number is odd.
+
+### `min`
 
 ```typescript
-s.number().min(5).parse(10); // ✅
-s.number().min(5).parse(5); // ✅
-s.number().min(5).parse(4); // ❌
+await s.number({ min: 5 }).parse(10); // ✅
+await s.number({ min: 5 }).parse(5); // ✅
+await s.number({ min: 5 }).parse(4); // ❌
 ```
 
-### `.max(value: number)`
-
-Checks if the number is less than or equal to `value`.
+### `max`
 
 ```typescript
-s.number().max(5).parse(1); // ✅
-s.number().max(5).parse(5); // ✅
-s.number().max(5).parse(6); // ❌
+await s.number({ max: 5 }).parse(1); // ✅
+await s.number({ max: 5 }).parse(5); // ✅
+await s.number({ max: 5 }).parse(6); // ❌
 ```
 
-### `.gt(value: number)`
-
-Checks if the number is greater than `value`.
+### `gt` (greater than)
 
 ```typescript
-s.number().gt(5).parse(6); // ✅
-s.number().gt(5).parse(5); // ❌
+await s.number({ gt: 5 }).parse(6); // ✅
+await s.number({ gt: 5 }).parse(5); // ❌
 ```
 
-### `.gte(value: number)`
-
-Checks if the number is greater than or equal to `value`. (Alias for `.min()`)
+### `lt` (less than)
 
 ```typescript
-s.number().gte(5).parse(5); // ✅
-s.number().gte(5).parse(4); // ❌
+await s.number({ lt: 5 }).parse(4); // ✅
+await s.number({ lt: 5 }).parse(5); // ❌
 ```
 
-### `.lt(value: number)`
-
-Checks if the number is less than `value`.
-
-```typescript
-s.number().lt(5).parse(4); // ✅
-s.number().lt(5).parse(5); // ❌
-```
-
-### `.lte(value: number)`
-
-Checks if the number is less than or equal to `value`. (Alias for `.max()`)
-
-```typescript
-s.number().lte(5).parse(5); // ✅
-s.number().lte(5).parse(6); // ❌
-```
-
-### `.range([min, max]: [number, number])`
+### `range`
 
 Checks if the number is within the inclusive range `[min, max]`.
 
 ```typescript
-s.number().range([5, 10]).parse(7); // ✅
-s.number().range([5, 10]).parse(5); // ✅
-s.number().range([5, 10]).parse(10); // ✅
-s.number().range([5, 10]).parse(4); // ❌
-s.number().range([5, 10]).parse(11); // ❌
+await s.number({ range: [5, 10] }).parse(7); // ✅
+await s.number({ range: [5, 10] }).parse(5); // ✅
+await s.number({ range: [5, 10] }).parse(10); // ✅
+await s.number({ range: [5, 10] }).parse(4); // ❌
 ```
 
-### `.exclusiveRange([min, max]: [number, number])`
+### `exclusiveRange`
 
 Checks if the number is within the exclusive range `(min, max)`.
 
 ```typescript
-s.number().exclusiveRange([5, 10]).parse(7); // ✅
-s.number().exclusiveRange([5, 10]).parse(5); // ❌
-s.number().exclusiveRange([5, 10]).parse(10); // ❌
+await s.number({ exclusiveRange: [5, 10] }).parse(7); // ✅
+await s.number({ exclusiveRange: [5, 10] }).parse(5); // ❌
+await s.number({ exclusiveRange: [5, 10] }).parse(10); // ❌
 ```
 
-### `.integer()`
-
-Checks if the number is an integer.
+### `integer`
 
 ```typescript
-s.number().integer().parse(10); // ✅
-s.number().integer().parse(10.5); // ❌
+await s.number({ integer: true }).parse(10); // ✅
+await s.number({ integer: true }).parse(10.5); // ❌
 ```
 
-### `.positive()`
+### `positive`
 
-Checks if the number is positive (> 0).
+Checks if the number is greater than 0.
 
 ```typescript
-s.number().positive().parse(1); // ✅
-s.number().positive().parse(0); // ❌
-s.number().positive().parse(-1); // ❌
+await s.number({ positive: true }).parse(1); // ✅
+await s.number({ positive: true }).parse(0); // ❌
+await s.number({ positive: true }).parse(-1); // ❌
 ```
 
-### `.negative()`
+### `negative`
 
-Checks if the number is negative (< 0).
+Checks if the number is less than 0.
 
 ```typescript
-s.number().negative().parse(-1); // ✅
-s.number().negative().parse(0); // ❌
-s.number().negative().parse(1); // ❌
+await s.number({ negative: true }).parse(-1); // ✅
+await s.number({ negative: true }).parse(0); // ❌
+await s.number({ negative: true }).parse(1); // ❌
 ```
 
-### `.zero()`
-
-Checks if the number is exactly 0.
+### `multipleOf`
 
 ```typescript
-s.number().zero().parse(0); // ✅
-s.number().zero().parse(1); // ❌
+await s.number({ multipleOf: 5 }).parse(10); // ✅
+await s.number({ multipleOf: 5 }).parse(7); // ❌
 ```
 
-### `.float()`
-
-Checks if the number is a float (i.e., not an integer).
+### `even` / `odd`
 
 ```typescript
-s.number().float().parse(10.5); // ✅
-s.number().float().parse(10); // ❌
-```
-
-### `.multipleOf(value: number)`
-
-Checks if the number is a multiple of `value`.
-
-```typescript
-s.number().multipleOf(5).parse(10); // ✅
-s.number().multipleOf(5).parse(7); // ❌
-```
-
-### `.even()`
-
-Checks if the number is even.
-
-```typescript
-s.number().even().parse(2); // ✅
-s.number().even().parse(3); // ❌
-```
-
-### `.odd()`
-
-Checks if the number is odd.
-
-```typescript
-s.number().odd().parse(3); // ✅
-s.number().odd().parse(2); // ❌
+await s.number({ even: true }).parse(2); // ✅
+await s.number({ even: true }).parse(3); // ❌
+await s.number({ odd: true }).parse(3); // ✅
+await s.number({ odd: true }).parse(2); // ❌
 ```

@@ -1,104 +1,82 @@
 # Array Validator
 
-The `array` validator checks if a value is an array. It provides several methods for validating the array's contents and properties.
+The `array` validator checks if a value is an array and can validate its contents and properties.
 
 ## Usage
+
+You can pass a configuration object to `s.array()` to specify validation rules.
 
 ```typescript
 import { s } from "s-val";
 
-const schema = s.array();
+// An array of strings that must contain at least one element.
+const schema = s.array({
+  of: s.string(),
+  nonEmpty: true,
+});
 
-schema.parse([1, "two", true]); // ✅
-schema.parse({ a: 1 }); // ❌
+await schema.parse(["hello", "world"]); // ✅
+await schema.parse([]); // ❌
+await schema.parse(["hello", 123]); // ❌
 ```
 
-## Methods
+## Configuration Properties
 
-### `.length(len: number)`
-
-Checks if the array has exactly `len` elements.
-
-```typescript
-s.array().length(3).parse([1, 2, 3]); // ✅
-s.array().length(3).parse([1, 2]); // ❌
-```
-
-### `.minLength(min: number)`
-
-Checks if the array has at least `min` elements.
-
-```typescript
-s.array().minLength(2).parse([1, 2, 3]); // ✅
-s.array().minLength(2).parse([1, 2]); // ✅
-s.array().minLength(2).parse([1]); // ❌
-```
-
-### `.maxLength(max: number)`
-
-Checks if the array has at most `max` elements.
-
-```typescript
-s.array().maxLength(3).parse([1, 2]); // ✅
-s.array().maxLength(3).parse([1, 2, 3]); // ✅
-s.array().maxLength(3).parse([1, 2, 3, 4]); // ❌
-```
-
-### `.nonEmpty()`
-
-Checks if the array has at least one element. This is a shorthand for `.minLength(1)`.
-
-```typescript
-s.array().nonEmpty().parse([1]); // ✅
-s.array().nonEmpty().parse([]); // ❌
-```
-
-### `.contains(element: any)`
-
-Checks if the array contains the specified `element`. The check is performed using `Array.prototype.includes()`.
-
-```typescript
-s.array().contains("a").parse(["a", "b", "c"]); // ✅
-s.array().contains("d").parse(["a", "b", "c"]); // ❌
-```
-
-### `.excludes(element: any)`
-
-Checks if the array does not contain the specified `element`. The check is performed using `!Array.prototype.includes()`.
-
-```typescript
-s.array().excludes("d").parse(["a", "b", "c"]); // ✅
-s.array().excludes("a").parse(["a", "b", "c"]); // ❌
-```
-
-### `.unique()`
-
-Checks if all elements in the array are unique.
-
-```typescript
-s.array().unique().parse([1, 2, 3]); // ✅
-s.array().unique().parse([1, 2, 2]); // ❌
-```
-
-### `.ofType(schema: SchemaLike)`
+### `of`
 
 Checks if every element in the array matches the provided `schema`.
 
-```typescript
-const stringArray = s.array().ofType(s.string());
+- **Type**: `Schema`
+- **Example**: `s.array({ of: s.string() })`
 
-stringArray.parse(["a", "b", "c"]); // ✅
-stringArray.parse(["a", "b", 1]); // ❌
-```
-
-### `.items(schemas: SchemaLike[])`
+### `items`
 
 Checks if the array's elements match the `schemas` provided, in order. This is used for validating tuples. The array must have the same number of elements as the `schemas` array.
 
-```typescript
-const tupleSchema = s.array().items([s.string(), s.number(), s.boolean()]);
+- **Type**: `Schema[]`
+- **Example**: `s.array({ items: [s.string(), s.number()] })`
 
-tupleSchema.parse(["a", 1, true]); // ✅
-tupleSchema.parse(["a", 1]); // ❌ (length mismatch)
-tupleSchema.parse(["a", 1, "c"]); // ❌ (type mismatch)
+### Length Validation
+
+- `length: number`: Checks if the array has an exact number of elements.
+- `minLength: number`: Checks if the array has at least a minimum number of elements.
+- `maxLength: number`: Checks if the array has at most a maximum number of elements.
+- `nonEmpty: boolean`: A shorthand for `minLength: 1`.
+
+**Example:**
+
+```typescript
+// An array that must contain between 2 and 4 numbers.
+const schema = s.array({
+  of: s.number(),
+  minLength: 2,
+  maxLength: 4,
+});
+
+await schema.parse([1, 2]); // ✅
+await schema.parse([1, 2, 3, 4]); // ✅
+await schema.parse([1]); // ❌
+await schema.parse([1, 2, 3, 4, 5]); // ❌
+```
+
+### Content Validation
+
+- `contains: any | any[]`: Checks if the array contains at least one of the specified elements.
+- `excludes: any | any[]`: Checks if the array does not contain any of the specified elements.
+- `unique: boolean`: Checks if all elements in the array are unique.
+
+**Example:**
+
+```typescript
+const schema = s.array({
+  of: s.string(),
+  contains: "a",
+  excludes: "d",
+  unique: true,
+});
+
+await schema.parse(["a", "b", "c"]); // ✅
+await schema.parse(["b", "c"]); // ❌ (must contain 'a')
+await schema.parse(["a", "b", "d"]); // ❌ (must not contain 'd')
+await schema.parse(["a", "b", "a"]); // ❌ (must be unique)
 ```

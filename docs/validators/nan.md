@@ -9,7 +9,7 @@ import { s } from "s-val";
 
 const schema = s.nan();
 
-schema.parse(NaN); // ✅
-schema.parse(Number("hello")); // ✅
-schema.parse(123); // ❌
+await schema.parse(NaN); // ✅
+await schema.parse(Number("hello")); // ✅
+await schema.parse(123); // ❌
 ```

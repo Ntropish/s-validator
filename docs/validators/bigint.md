@@ -9,7 +9,7 @@ import { s } from "s-val";
 
 const schema = s.bigint();
 
-schema.parse(123n); // ✅
-schema.parse(BigInt(9007199254740991)); // ✅
-schema.parse(123); // ❌
+await schema.parse(123n); // ✅
+await schema.parse(BigInt(9007199254740991)); // ✅
+await schema.parse(123); // ❌
 ```

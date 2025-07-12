@@ -4,37 +4,32 @@ The `date` validator checks if a value is a JavaScript `Date` object.
 
 ## Usage
 
+You can pass a configuration object to `s.date()` to specify validation rules.
+
 ```typescript
 import { s } from "s-val";
 
-const schema = s.date();
+const schema = s.date({
+  min: new Date("2023-01-01"),
+});
 
-schema.parse(new Date()); // ✅
-schema.parse("2023-01-01"); // ❌
+await schema.parse(new Date("2023-01-02")); // ✅
+await schema.parse("2023-01-01"); // ❌ (not a Date object)
+await schema.parse(new Date("2022-12-31")); // ❌ (before min date)
 ```
 
-## Methods
+## Configuration Properties
 
-### `.min(minDate: Date)`
+### `min`
 
-Checks if the date is on or after `minDate`.
+Checks if the date is on or after the specified date.
 
-```typescript
-const min = new Date("2023-01-01");
+- **Type**: `Date`
+- **Example**: `s.date({ min: new Date("2023-01-01") })`
 
-s.date().min(min).parse(new Date("2023-01-02")); // ✅
-s.date().min(min).parse(new Date("2023-01-01")); // ✅
-s.date().min(min).parse(new Date("2022-12-31")); // ❌
-```
+### `max`
 
-### `.max(maxDate: Date)`
+Checks if the date is on or before the specified date.
 
-Checks if the date is on or before `maxDate`.
-
-```typescript
-const max = new Date("2023-01-01");
-
-s.date().max(max).parse(new Date("2022-12-31")); // ✅
-s.date().max(max).parse(new Date("2023-01-01")); // ✅
-s.date().max(max).parse(new Date("2023-01-02")); // ❌
-```
+- **Type**: `Date`
+- **Example**: `s.date({ max: new Date("2023-01-01") })`

@@ -12,8 +12,8 @@ import { s } from "s-val";
 const schema = s.set(s.number());
 
 const set = new Set([1, 2, 3]);
-schema.parse(set); // ✅
+await schema.parse(set); // ✅
 
 const invalidSet = new Set([1, "2", 3]); // Contains a string
-schema.parse(invalidSet); // ❌
+await schema.parse(invalidSet); // ❌
 ```

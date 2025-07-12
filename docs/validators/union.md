@@ -28,14 +28,18 @@ await stringOrNumber.parse(true); // ❌
 import { s } from "s-val";
 
 const eventSchema = s.union([
-  s.object().properties({
-    type: s.string().oneOf(["click"]),
-    x: s.number(),
-    y: s.number(),
+  s.object({
+    properties: {
+      type: s.literal("click"),
+      x: s.number(),
+      y: s.number(),
+    },
   }),
-  s.object().properties({
-    type: s.string().oneOf(["keypress"]),
-    key: s.string(),
+  s.object({
+    properties: {
+      type: s.literal("keypress"),
+      key: s.string(),
+    },
   }),
 ]);
 

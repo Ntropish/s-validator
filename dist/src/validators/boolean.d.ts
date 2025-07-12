@@ -1,6 +1,2 @@
-export declare const booleanValidatorMap: {
-    readonly boolean: {
-        identity: (value: unknown) => value is boolean;
-        required: (value: boolean) => boolean;
-    };
-};
+import { Plugin } from './types.js';
+export declare const booleanPlugin: Plugin;

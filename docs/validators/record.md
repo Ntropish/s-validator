@@ -8,8 +8,8 @@ It is similar to the `s.map()` validator, but it works with plain JavaScript obj
 
 You create a record schema by providing two arguments:
 
-1. A schema for the keys. This must be a schema that resolves to `string` or `number`.
-2. A schema for the values. This can be any `s-val` schema.
+1.  A schema for the keys. This must be `s.string()`, `s.number()`, or a literal schema (`s.literal()`) containing strings or numbers. Using any other schema type for the key will result in a compile-time TypeScript error.
+2.  A schema for the values. This can be any `s-val` schema.
 
 ```typescript
 import { s } from "s-val";
@@ -28,11 +28,14 @@ await scoresSchema.parse(scores); // ✅
 
 ## Key Validation
 
-The key schema is enforced for every key in the object.
+The key schema is enforced for every key in the object. For example, you can require all keys to be UUIDs.
 
 ```typescript
 // A record where keys must be valid UUIDs.
-const userRolesSchema = s.record(s.string({ uuid: true }), s.string());
+const userRolesSchema = s.record(
+  s.string({ validate: { uuid: true } }),
+  s.string()
+);
 
 const validRoles = {
   "f47ac10b-58cc-4372-a567-0e02b2c3d479": "admin",
@@ -49,7 +52,7 @@ const invalidRoles = {
 await userRolesSchema.parse(invalidRoles); // ❌
 ```
 
-> **Note:** Even if you use numbers as keys in your object literal, they are converted to strings during runtime. Therefore, your key schema should typically be a `s.string()` validator (e.g., `s.string().numeric()`).
+> **Note:** JavaScript object keys are implicitly converted to strings. If you use `s.number()` as the key schema, `s-val` will correctly validate the stringified number.
 
 ## Value Validation
 
@@ -60,11 +63,14 @@ The value schema is enforced for every value in the object. The value schema can
 const userSchema = s.object({
   properties: {
     name: s.string(),
-    email: s.string({ email: true }),
+    email: s.string({ validate: { email: true } }),
   },
 });
 
-const usersByIdSchema = s.record(s.string({ uuid: true }), userSchema);
+const usersByIdSchema = s.record(
+  s.string({ validate: { uuid: true } }),
+  userSchema
+);
 
 const validUsers = {
   "f47ac10b-58cc-4372-a567-0e02b2c3d479": {

@@ -11,29 +11,30 @@ import { s } from "s-val";
 
 // Check for a specific string
 const statusSchema = s.literal("success");
-statusSchema.parse("success"); // ✅
-statusSchema.parse("error"); // ❌
+await statusSchema.parse("success"); // ✅
+await statusSchema.parse("error"); // ❌
 
 // Check for a specific number
 const versionSchema = s.literal(2);
-versionSchema.parse(2); // ✅
-versionSchema.parse(3); // ❌
+await versionSchema.parse(2); // ✅
+await versionSchema.parse(3); // ❌
 
 // Check for a specific boolean
 const trueSchema = s.literal(true);
-trueSchema.parse(true); // ✅
-trueSchema.parse(false); // ❌
+await trueSchema.parse(true); // ✅
+await trueSchema.parse(false); // ❌
 ```
 
-This is especially useful for creating discriminated unions.
+This is especially useful for creating discriminated unions with `s.switch()` or `s.union()`.
 
 ```typescript
-const eventSchema = s.union([
-  s.object({
-    properties: { type: s.literal("click"), x: s.number(), y: s.number() },
-  }),
-  s.object({
-    properties: { type: s.literal("keypress"), key: s.string() },
-  }),
-]);
+const clickEvent = s.object({
+  properties: { type: s.literal("click"), x: s.number(), y: s.number() },
+});
+
+const keypressEvent = s.object({
+  properties: { type: s.literal("keypress"), key: s.string() },
+});
+
+const eventSchema = s.union([clickEvent, keypressEvent]);
 ```

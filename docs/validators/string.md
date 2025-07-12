@@ -13,88 +13,62 @@ await schema.parse("hello"); // -> "hello"
 await schema.parse(123); // -> throws ValidationError
 ```
 
-## Configuration
+## Usage
 
-### `length`
+You can pass a configuration object to `s.string()` to specify validation rules. All validation properties are optional.
 
-Checks if the string has an exact length.
+```typescript
+// A string that must be a valid email and have a max length of 100.
+const emailSchema = s.string({
+  validate: {
+    email: true,
+    maxLength: 100,
+  },
+});
 
-- **Type:** `number`
-- **Example:** `s.string({ length: 5 })`
+await emailSchema.parse("test@example.com"); // ✅
+await emailSchema.parse("not-an-email"); // ❌
+```
 
-### `minLength`
+## Validation Properties
 
-Checks if the string has a minimum length (inclusive).
+All validation rules are passed inside a `validate` property in the configuration object.
 
-- **Type:** `number`
-- **Example:** `s.string({ minLength: 3 })`
+### Length and Range
 
-### `maxLength`
+- `length: number`: Checks if the string has an exact length.
+- `minLength: number`: Checks if the string has a minimum length (inclusive).
+- `maxLength: number`: Checks if the string has a maximum length (inclusive).
+- `range: [min: number, max: number]`: Checks if the string's length is within an inclusive range.
+- `exclusiveRange: [min: number, max: number]`: Checks if the string's length is within an exclusive range.
 
-Checks if the string has a maximum length (inclusive).
+**Example:**
 
-- **Type:** `number`
-- **Example:** `s.string({ maxLength: 10 })`
+```typescript
+await s.string({ validate: { minLength: 3 } }).parse("abc"); // ✅
+await s.string({ validate: { range: [3, 5] } }).parse("abcd"); // ✅
+await s.string({ validate: { range: [3, 5] } }).parse("ab"); // ❌
+```
 
-### `range`
+### Patterns and Content
 
-Checks if the string's length is within a specified range (inclusive).
+- `pattern: RegExp`: Checks if the string matches a regular expression.
+- `oneOf: string[]`: Checks if the string is one of the specified options.
 
-- **Type:** `[number, number]` (a tuple of `[min, max]`)
-- **Example:** `s.string({ range: [3, 10] })`
+**Example:**
 
-### `exclusiveRange`
+```typescript
+await s.string({ validate: { pattern: /^[a-z]+$/ } }).parse("abc"); // ✅
+await s.string({ validate: { oneOf: ["admin", "user"] } }).parse("user"); // ✅
+```
 
-Checks if the string's length is within a specified range (exclusive).
+### Format Validators
 
-- **Type:** `[number, number]` (a tuple of `[min, max]`)
-- **Example:** `s.string({ exclusiveRange: [3, 10] })`
-
-### `pattern`
-
-Checks if the string matches a regular expression.
-
-- **Type:** `RegExp`
-- **Example:** `s.string({ pattern: /^[a-z]+$/ })`
-
-### `oneOf`
-
-Checks if the string is one of the specified options.
-
-- **Type:** `string[]`
-- **Example:** `s.string({ oneOf: ["admin", "user", "guest"] })`
-
-### `email`
-
-Checks if the string is a valid email address. Can be configured with `allowed` and `denied` lists for domains.
-
-- **Type:** `boolean` or `{ allowed?: (string | RegExp)[], denied?: (string | RegExp)[] }`
-- **Example:**
-  ```typescript
-  s.string({ email: true });
-  s.string({ email: { denied: ["example.com", /\.dev$/] } });
-  ```
-
-### `json`
-
-Checks if the string is a valid JSON string that also conforms to a nested schema.
-
-- **Type:** `Schema`
-- **Example:**
-  ```typescript
-  const userJson = s.string({
-    json: s.object({
-      properties: { name: s.string() },
-    }),
-  });
-  ```
-
-## Format Validators
-
-These validators check for common string formats. They are all enabled by passing `true`. Most can also be passed `false` to ensure the string does _not_ match the format.
+These validators check for common string formats. They are all enabled by passing `true`.
 
 | Property    | Description                        |
 | ----------- | ---------------------------------- |
+| `email`     | A valid email address.             |
 | `url`       | A valid URL.                       |
 | `uuid`      | A valid UUID.                      |
 | `uuidV7`    | A valid UUID v7.                   |
@@ -118,8 +92,38 @@ These validators check for common string formats. They are all enabled by passin
 **Example:**
 
 ```typescript
-const schema = s.string({ uuid: true });
+const schema = s.string({ validate: { uuid: true } });
+await schema.parse("f47ac10b-58cc-4372-a567-0e02b2c3d479"); // ✅
+await schema.parse("not-a-uuid"); // ❌
+```
 
-await schema.parse("f47ac10b-58cc-4372-a567-0e02b2c3d479"); // -> "f47ac10b-58cc-4372-a567-0e02b2c3d479"
-await schema.parse("not-a-uuid"); // -> throws ValidationError
+The `email` validator can also be configured with `allowed` and `denied` lists for domains.
+
+```typescript
+await s
+  .string({
+    validate: {
+      email: { denied: ["example.com", /\.dev$/] },
+    },
+  })
+  .parse("test@example.com"); // ❌
+```
+
+### JSON Schema
+
+The `json` validator checks if a string is a valid JSON string that also conforms to a nested schema.
+
+**Example:**
+
+```typescript
+const userJsonSchema = s.string({
+  validate: {
+    json: s.object({
+      properties: { name: s.string() },
+    }),
+  },
+});
+
+await userJsonSchema.parse('{ "name": "John" }'); // ✅
+await userJsonSchema.parse('{ "name": 123 }'); // ❌
 ```

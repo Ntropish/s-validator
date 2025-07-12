@@ -11,9 +11,9 @@ import { s } from "s-val";
 
 const schema = s.any();
 
-schema.parse(123); // ✅
-schema.parse("a string"); // ✅
-schema.parse({ key: "value" }); // ✅
-schema.parse(null); // ✅
-schema.parse(undefined); // ✅
+await schema.parse(123); // ✅
+await schema.parse("a string"); // ✅
+await schema.parse({ key: "value" }); // ✅
+await schema.parse(null); // ✅
+await schema.parse(undefined); // ✅
 ```
