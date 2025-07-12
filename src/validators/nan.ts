@@ -1,7 +1,14 @@
-import { SchemaValidatorMap, ValidatorCollection } from "./types.js";
+import { Plugin } from "./types.js";
 
-export const nanValidatorMap = {
-  nan: {
-    identity: (value: unknown): value is number => Number.isNaN(value),
-  } satisfies ValidatorCollection<number>,
-} as const satisfies SchemaValidatorMap;
+export const nanPlugin: Plugin = {
+  nan: [
+    {
+      validate: {
+        identity: {
+          validator: (value: unknown): value is number => Number.isNaN(value),
+          message: (ctx) => `Value must be NaN.`,
+        },
+      },
+    },
+  ],
+};

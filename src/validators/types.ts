@@ -3,19 +3,32 @@ import { Schema } from "../index.js";
 // A stripped-down interface that recursive validators use to call `parse`.
 export interface SchemaLike {
   readonly config: Record<string, unknown>;
-  parse(context: ValidationContext): any;
-  safeParse(context: ValidationContext): Promise<SafeParseResult<any>>;
+  parse(data: any, ctx?: any): any;
+  safeParse(data: any, ctx?: any): Promise<SafeParseResult<any>>;
 }
 
 // The simplified context object passed through the validation chain.
-export type ValidationContext = {
+export interface ValidationContext {
   /** The original, top-level data passed to `parse()`. */
-  readonly rootData: any;
+  rootData: any;
   /** The path from the root to the current value being validated. */
-  readonly path: ReadonlyArray<string | number>;
+  path: (string | number)[];
   /** The value at the current path. */
-  readonly value: any;
-};
+  value: any;
+  /** The user-provided context object. */
+  ctx?: any;
+}
+
+export interface MessageProducerContext {
+  label: string;
+  value: any;
+  path: (string | number)[];
+  args: any[];
+  dataType: string;
+  ctx?: any;
+}
+
+export type MessageProducer = (context: MessageProducerContext) => string;
 
 // The simplified function signature for a single preparation.
 export type PreparationFunction<T = any, Args extends any[] = any[]> = (
@@ -41,6 +54,11 @@ export type ValidatorFunction<T = any, Args extends any[] = any[]> = (
   schema: Schema<T, any>
 ) => boolean | Promise<boolean>;
 
+export type ValidatorDefinition<T = any> = {
+  validator: ValidatorFunction<T, any[]>;
+  message: MessageProducer;
+};
+
 // A collection of preparations for a specific data type.
 export type PreparationCollection<T = any> = {
   [preparationName: string]: PreparationFunction<T, any[]>;
@@ -53,14 +71,24 @@ export type TransformationCollection<T = any> = {
 
 // A collection of validators for a specific data type.
 export type ValidatorCollection<T = any> = {
-  identity: ValidatorFunction<unknown, []>;
-} & {
-  [validatorName: string]: ValidatorFunction<T, any[]>;
+  [validatorName: string]: ValidatorDefinition<T>;
+};
+
+export interface PluginDataTypeConfiguration {
+  prepare?: PreparationCollection;
+  transform?: TransformationCollection;
+  validate?: ValidatorCollection;
+}
+
+export type Plugin = {
+  [dataType: string]: PluginDataTypeConfiguration[];
 };
 
 // The main map of all data types to their validator collections.
 export type SchemaValidatorMap = {
-  [dataType: string]: ValidatorCollection<any>;
+  [dataType: string]: {
+    [validatorName: string]: ValidatorFunction;
+  };
 };
 
 export type ValidationIssue = {

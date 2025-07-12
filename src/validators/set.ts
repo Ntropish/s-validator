@@ -1,7 +1,16 @@
-import { SchemaValidatorMap, ValidatorCollection } from "./types.js";
+import { Plugin } from "./types.js";
 
-export const setValidatorMap = {
-  set: {
-    identity: (value: unknown): value is Set<any> => value instanceof Set,
-  } satisfies ValidatorCollection<Set<any>>,
-} as const satisfies SchemaValidatorMap;
+export const setPlugin: Plugin = {
+  set: [
+    {
+      validate: {
+        identity: {
+          validator: (value: unknown): value is Set<any> =>
+            value instanceof Set,
+          message: (ctx) =>
+            `Invalid type. Expected Set, received ${typeof ctx.value}.`,
+        },
+      },
+    },
+  ],
+};

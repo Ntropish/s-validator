@@ -3,6 +3,7 @@ import {
   validatorMap,
   preparationMap,
   transformationMap,
+  messageMap,
 } from "./validator-map.js";
 import { StandardSchemaV1 } from "./standard-schema.js";
 import {
@@ -16,6 +17,8 @@ import {
   SafeParseSuccess,
   PreparationFunction,
   TransformationFunction,
+  MessageProducer,
+  MessageProducerContext,
 } from "./validators/types.js";
 
 // A utility to force TS to expand a type in tooltips for better DX.
@@ -125,6 +128,7 @@ export class Schema<TOutput, TInput = TOutput>
   protected customValidators: CustomValidator<TOutput>[] = [];
   private dataType: string;
   public config: Record<string, unknown>;
+  public label: string;
   public readonly "~standard": StandardSchemaV1.Props<TInput, TOutput>;
 
   constructor(
@@ -145,9 +149,13 @@ export class Schema<TOutput, TInput = TOutput>
       ...rest
     } = config as ValidatorConfig<any> & Record<string, any>;
 
-    const validatorCollection = validatorMap[dataType];
-    const preparationCollection = preparationMap[dataType];
-    const transformationCollection = transformationMap[dataType];
+    this.label =
+      (config.label as string) ||
+      this.dataType.charAt(0).toUpperCase() + this.dataType.slice(1);
+
+    const validatorCollection = (validatorMap as any)[dataType];
+    const preparationCollection = (preparationMap as any)[dataType];
+    const transformationCollection = (transformationMap as any)[dataType];
 
     if (validatorCollection?.identity) {
       this.validators.push({
@@ -274,21 +282,36 @@ export class Schema<TOutput, TInput = TOutput>
     // All validations
     for (const { name, validator, args } of this.validators) {
       if (!(await validator(current_value, args, context, this))) {
-        if (name === "identity") {
-          issues.push({
-            path: context.path,
-            message: `Invalid type. Expected ${
-              this.dataType
-            }, received ${typeof current_value}.`,
-          });
-          // For identity, we can stop further validation on this schema
-          break;
+        const messageProducerContext: MessageProducerContext = {
+          label: this.label,
+          value: current_value,
+          path: context.path,
+          dataType: this.dataType,
+          ctx: context.ctx,
+          args,
+        };
+
+        let message: string | undefined;
+        const userMessage = messages[name];
+
+        if (typeof userMessage === "string") {
+          message = userMessage;
+        } else if (typeof userMessage === "function") {
+          message = (userMessage as MessageProducer)(messageProducerContext);
+        } else {
+          const defaultMessageProducer = (messageMap as any)[this.dataType]?.[
+            name
+          ];
+          if (defaultMessageProducer) {
+            message = defaultMessageProducer(messageProducerContext);
+          }
         }
+
         issues.push({
           path: context.path,
-          message:
-            messages[name] ?? `Validation failed for ${this.dataType}.${name}`,
+          message: message ?? `Validation failed for ${this.dataType}.${name}`,
         });
+        if (name === "identity") break;
       }
     }
 
@@ -305,12 +328,27 @@ export class Schema<TOutput, TInput = TOutput>
             });
 
       if (!result) {
-        const message =
-          typeof customValidator === "function"
-            ? `Custom validation failed for ${this.dataType}`
-            : customValidator.message ??
-              `Custom validation failed for ${this.dataType}`;
-        issues.push({ path: context.path, message });
+        let message: string | undefined;
+
+        if (typeof customValidator === "object" && customValidator.message) {
+          if (typeof customValidator.message === "string") {
+            message = customValidator.message;
+          } else {
+            message = (customValidator.message as MessageProducer)({
+              label: this.label,
+              value: current_value,
+              path: context.path,
+              dataType: this.dataType,
+              ctx: context.ctx,
+              args: [], // Custom validators don't have 'args' in the same way
+            });
+          }
+        }
+
+        issues.push({
+          path: context.path,
+          message: message ?? `Custom validation failed for ${this.dataType}`,
+        });
       }
     }
 
@@ -344,11 +382,12 @@ export class Schema<TOutput, TInput = TOutput>
     return current_value;
   }
 
-  public async parse(data: TInput): Promise<TOutput> {
+  public async parse(data: TInput, ctx?: any): Promise<TOutput> {
     const context: ValidationContext = {
       rootData: data,
       path: [],
       value: data,
+      ctx: ctx,
     };
 
     const preparedValue = await this._prepare(context);
@@ -360,9 +399,12 @@ export class Schema<TOutput, TInput = TOutput>
     return transformedValue;
   }
 
-  public async safeParse(data: TInput): Promise<SafeParseResult<TOutput>> {
+  public async safeParse(
+    data: TInput,
+    ctx?: any
+  ): Promise<SafeParseResult<TOutput>> {
     try {
-      const parsedData = await this.parse(data);
+      const parsedData = await this.parse(data, ctx);
       return { status: "success", data: parsedData };
     } catch (e) {
       if (e instanceof ValidationError) {
@@ -376,9 +418,9 @@ export class Schema<TOutput, TInput = TOutput>
     return new Schema(
       this.dataType,
       { ...this.config, optional: true },
-      validatorMap,
-      preparationMap,
-      transformationMap
+      validatorMap as any,
+      preparationMap as any,
+      transformationMap as any
     );
   }
 
@@ -386,9 +428,9 @@ export class Schema<TOutput, TInput = TOutput>
     return new Schema(
       this.dataType,
       { ...this.config, nullable: true },
-      validatorMap,
-      preparationMap,
-      transformationMap
+      validatorMap as any,
+      preparationMap as any,
+      transformationMap as any
     );
   }
 }
@@ -398,7 +440,13 @@ class ObjectSchema<
   T = InferSObjectType<P>
 > extends Schema<T> {
   constructor(config: SObjectOptions<P>) {
-    super("object", config, validatorMap, preparationMap, transformationMap);
+    super(
+      "object",
+      config,
+      validatorMap as any,
+      preparationMap as any,
+      transformationMap as any
+    );
   }
 
   public async _prepare(context: ValidationContext): Promise<any> {
@@ -611,7 +659,13 @@ class ArraySchema<T extends Schema<any, any>> extends Schema<
   constructor(
     config: ValidatorConfig<any> & { validate: { ofType?: T; items?: any } }
   ) {
-    super("array", config, validatorMap, preparationMap, transformationMap);
+    super(
+      "array",
+      config,
+      validatorMap as any,
+      preparationMap as any,
+      transformationMap as any
+    );
     const { validate } = config as {
       validate?: { ofType?: T; items?: Schema<any, any>[] };
     };
@@ -802,7 +856,13 @@ class RecordSchema<
   private valueSchema: V;
 
   constructor(keySchema: K, valueSchema: V, config: ValidatorConfig<any> = {}) {
-    super("record", config, validatorMap, preparationMap, transformationMap);
+    super(
+      "record",
+      config,
+      validatorMap as any,
+      preparationMap as any,
+      transformationMap as any
+    );
     this.keySchema = keySchema;
     this.valueSchema = valueSchema;
   }
@@ -957,9 +1017,9 @@ class SwitchSchema<
     super(
       "switch",
       {},
-      validatorMap as SchemaValidatorMap,
-      preparationMap,
-      transformationMap
+      validatorMap as any,
+      preparationMap as any,
+      transformationMap as any
     );
     this.keyFn = keyFn;
     this.schemas = schemas;
@@ -1014,9 +1074,9 @@ class MapSchema<
     super(
       "map",
       {},
-      validatorMap as SchemaValidatorMap,
-      preparationMap,
-      transformationMap
+      validatorMap as any,
+      preparationMap as any,
+      transformationMap as any
     );
     this.keySchema = keySchema;
     this.valueSchema = valueSchema;
@@ -1152,9 +1212,9 @@ class SetSchema<V extends Schema<any, any>> extends Schema<
     super(
       "set",
       {},
-      validatorMap as SchemaValidatorMap,
-      preparationMap,
-      transformationMap
+      validatorMap as any,
+      preparationMap as any,
+      transformationMap as any
     );
     this.valueSchema = valueSchema;
   }
@@ -1253,9 +1313,9 @@ class InstanceOfSchema<T extends new (...args: any) => any> extends Schema<
     super(
       "instanceof",
       {},
-      validatorMap as SchemaValidatorMap,
-      preparationMap,
-      transformationMap
+      validatorMap as any,
+      preparationMap as any,
+      transformationMap as any
     );
     this.constructorFn = constructorFn;
   }
@@ -1295,9 +1355,9 @@ class LiteralSchema<
     super(
       "literal",
       {},
-      validatorMap as SchemaValidatorMap,
-      preparationMap,
-      transformationMap
+      validatorMap as any,
+      preparationMap as any,
+      transformationMap as any
     );
     this.literal = literal;
   }
@@ -1342,9 +1402,9 @@ class UnionSchema<
     super(
       "union",
       {},
-      validatorMap as SchemaValidatorMap,
-      preparationMap,
-      transformationMap
+      validatorMap as any,
+      preparationMap as any,
+      transformationMap as any
     );
     this.schemas = schemas;
   }
@@ -1474,9 +1534,9 @@ function createSchemaFunction<
     return new Schema<WithNullable, InputType>(
       dataType as string,
       (config || {}) as any,
-      validatorMap,
-      preparationMap,
-      transformationMap
+      validatorMap as any,
+      preparationMap as any,
+      transformationMap as any
     );
   };
 }
@@ -1490,7 +1550,7 @@ export function createSchemaBuilder<TMap extends SchemaValidatorMap>(
 
   for (const key in validatorMap) {
     if (key === "object" || key === "array") continue;
-    builder[key] = createSchemaFunction(key, validatorMap);
+    builder[key] = createSchemaFunction(key, validatorMap as any);
   }
 
   builder.object = <P extends SObjectProperties>(config: SObjectOptions<P>) =>

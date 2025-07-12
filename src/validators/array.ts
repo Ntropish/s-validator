@@ -1,45 +1,57 @@
-import { Schema, ValidationError, ValidationContext } from "./types.js";
+import { Plugin } from "./types.js";
 
-export const arrayValidators = {
-  identity: (value: unknown): value is any[] => {
-    return Array.isArray(value);
-  },
-
-  length: (value: any[], [length]: [number]): boolean => {
-    return value.length === length;
-  },
-
-  minLength: (value: any[], [minLength]: [number]): boolean => {
-    return value.length >= minLength;
-  },
-
-  maxLength: (value: any[], [maxLength]: [number]): boolean => {
-    return value.length <= maxLength;
-  },
-
-  nonEmpty: (value: any[]): boolean => {
-    return value.length > 0;
-  },
-
-  contains: (value: any[], [element]: [any]): boolean => {
-    return value.includes(element);
-  },
-
-  excludes: (value: any[], [element]: [any]): boolean => {
-    return !value.includes(element);
-  },
-
-  unique: (value: any[]): boolean => {
-    return new Set(value).size === value.length;
-  },
-
-  items: (
-    value: any[],
-    [schemas]: [Schema<any, any>[]],
-    context: ValidationContext
-  ): Promise<boolean> => {
-    // This is a placeholder. The actual logic is now in ArraySchema._parse
-    // but the validator needs to exist for it to be picked up by the constructor.
-    return Promise.resolve(true);
-  },
+export const arrayPlugin: Plugin = {
+  array: [
+    {
+      validate: {
+        identity: {
+          validator: (value: unknown): value is any[] => Array.isArray(value),
+          message: (ctx) =>
+            `Invalid type. Expected array, received ${typeof ctx.value}.`,
+        },
+        length: {
+          validator: (value: any[], [length]: [number]) =>
+            value.length === length,
+          message: (ctx) =>
+            `${ctx.label} must contain exactly ${ctx.args[0]} items.`,
+        },
+        minLength: {
+          validator: (value: any[], [minLength]: [number]) =>
+            value.length >= minLength,
+          message: (ctx) =>
+            `${ctx.label} must contain at least ${ctx.args[0]} items.`,
+        },
+        maxLength: {
+          validator: (value: any[], [maxLength]: [number]) =>
+            value.length <= maxLength,
+          message: (ctx) =>
+            `${ctx.label} must contain at most ${ctx.args[0]} items.`,
+        },
+        nonEmpty: {
+          validator: (value: any[]) => value.length > 0,
+          message: (ctx) => `${ctx.label} must not be empty.`,
+        },
+        contains: {
+          validator: (value: any[], [element]: [any]) =>
+            value.includes(element),
+          message: (ctx) =>
+            `${ctx.label} must contain the element ${ctx.args[0]}.`,
+        },
+        excludes: {
+          validator: (value: any[], [element]: [any]) =>
+            !value.includes(element),
+          message: (ctx) =>
+            `${ctx.label} must not contain the element ${ctx.args[0]}.`,
+        },
+        unique: {
+          validator: (value: any[]) => new Set(value).size === value.length,
+          message: (ctx) => `${ctx.label} must contain unique items.`,
+        },
+        items: {
+          validator: () => true, // Placeholder
+          message: (ctx) => `Invalid item in ${ctx.label}.`, // Placeholder
+        },
+      },
+    },
+  ],
 };

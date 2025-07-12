@@ -1,7 +1,16 @@
-import { SchemaValidatorMap, ValidatorCollection } from "./types.js";
+import { Plugin } from "./types.js";
 
-export const mapValidatorMap = {
-  map: {
-    identity: (value: unknown): value is Map<any, any> => value instanceof Map,
-  } satisfies ValidatorCollection<Map<any, any>>,
-} as const satisfies SchemaValidatorMap;
+export const mapPlugin: Plugin = {
+  map: [
+    {
+      validate: {
+        identity: {
+          validator: (value: unknown): value is Map<any, any> =>
+            value instanceof Map,
+          message: (ctx) =>
+            `Invalid type. Expected Map, received ${typeof ctx.value}.`,
+        },
+      },
+    },
+  ],
+};

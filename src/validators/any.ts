@@ -1,7 +1,14 @@
-import { SchemaValidatorMap, ValidatorCollection } from "./types.js";
+import { Plugin } from "./types.js";
 
-export const anyValidatorMap = {
-  any: {
-    identity: (value: unknown): value is any => true,
-  } satisfies ValidatorCollection<any>,
-} as const;
+export const anyPlugin: Plugin = {
+  any: [
+    {
+      validate: {
+        identity: {
+          validator: (value: unknown): value is any => true,
+          message: (ctx) => "Invalid value.", // This should ideally never be reached
+        },
+      },
+    },
+  ],
+};

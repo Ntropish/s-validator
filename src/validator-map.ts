@@ -1,73 +1,78 @@
-import { Intersect, UnionToIntersection } from "./utils.js";
-import { arrayValidators } from "./validators/array.js";
-import {
-  booleanValidatorMap,
-  booleanPreparations,
-} from "./validators/boolean.js";
-import { numberValidatorMap, numberPreparations } from "./validators/number.js";
-import { objectValidators } from "./validators/object.js";
-import {
-  stringValidatorMap,
-  stringPreparations,
-  stringTransformations,
-} from "./validators/string.js";
-import { SchemaValidatorMap } from "./validators/types.js";
-import { dateValidatorMap, datePreparations } from "./validators/date.js";
-import { anyValidatorMap } from "./validators/any.js";
-import { bigintValidatorMap, bigintPreparations } from "./validators/bigint.js";
-import { nanValidatorMap } from "./validators/nan.js";
-import { unknownValidatorMap } from "./validators/unknown.js";
-import { neverValidatorMap } from "./validators/never.js";
-import { mapValidatorMap } from "./validators/map.js";
-import { setValidatorMap } from "./validators/set.js";
-import { instanceofValidatorMap } from "./validators/instanceof.js";
+import { Plugin } from "./validators/types.js";
+import { anyPlugin } from "./validators/any.js";
+import { arrayPlugin } from "./validators/array.js";
+import { bigintPlugin } from "./validators/bigint.js";
+import { booleanPlugin } from "./validators/boolean.js";
+import { datePlugin } from "./validators/date.js";
+import { instanceofPlugin } from "./validators/instanceof.js";
+import { mapPlugin } from "./validators/map.js";
+import { nanPlugin } from "./validators/nan.js";
+import { neverPlugin } from "./validators/never.js";
+import { numberPlugin } from "./validators/number.js";
+import { objectPlugin } from "./validators/object.js";
+import { setPlugin } from "./validators/set.js";
+import { stringPlugin } from "./validators/string.js";
+import { unknownPlugin } from "./validators/unknown.js";
 
-const arrayValidatorMap = { array: arrayValidators };
-const objectValidatorMap = { object: objectValidators };
+const plugins: Plugin[] = [
+  anyPlugin,
+  arrayPlugin,
+  bigintPlugin,
+  booleanPlugin,
+  datePlugin,
+  instanceofPlugin,
+  mapPlugin,
+  nanPlugin,
+  neverPlugin,
+  numberPlugin,
+  objectPlugin,
+  setPlugin,
+  stringPlugin,
+  unknownPlugin,
+];
 
-type ValidatorMapUnion =
-  | typeof stringValidatorMap
-  | typeof numberValidatorMap
-  | typeof booleanValidatorMap
-  | typeof objectValidatorMap
-  | typeof arrayValidatorMap
-  | typeof dateValidatorMap
-  | typeof anyValidatorMap
-  | typeof bigintValidatorMap
-  | typeof nanValidatorMap
-  | typeof unknownValidatorMap
-  | typeof neverValidatorMap
-  | typeof mapValidatorMap
-  | typeof setValidatorMap
-  | typeof instanceofValidatorMap;
+function mergePlugins(plugins: Plugin[]) {
+  const validatorMap = {};
+  const preparationMap = {};
+  const transformationMap = {};
+  const messageMap = {};
 
-type MergedValidators = Intersect<UnionToIntersection<ValidatorMapUnion>>;
+  for (const plugin of plugins) {
+    for (const dataType in plugin) {
+      if (!Object.prototype.hasOwnProperty.call(plugin, dataType)) continue;
 
-export const validatorMap: MergedValidators = {
-  ...stringValidatorMap,
-  ...numberValidatorMap,
-  ...booleanValidatorMap,
-  ...objectValidatorMap,
-  ...arrayValidatorMap,
-  ...dateValidatorMap,
-  ...anyValidatorMap,
-  ...bigintValidatorMap,
-  ...nanValidatorMap,
-  ...unknownValidatorMap,
-  ...neverValidatorMap,
-  ...mapValidatorMap,
-  ...setValidatorMap,
-  ...instanceofValidatorMap,
-};
+      validatorMap[dataType] = validatorMap[dataType] || {};
+      preparationMap[dataType] = preparationMap[dataType] || {};
+      transformationMap[dataType] = transformationMap[dataType] || {};
+      messageMap[dataType] = messageMap[dataType] || {};
 
-export const preparationMap = {
-  string: stringPreparations,
-  date: datePreparations,
-  number: numberPreparations,
-  bigint: bigintPreparations,
-  boolean: booleanPreparations,
-};
+      for (const config of plugin[dataType]) {
+        if (config.prepare) {
+          Object.assign(preparationMap[dataType], config.prepare);
+        }
+        if (config.transform) {
+          Object.assign(transformationMap[dataType], config.transform);
+        }
+        if (config.validate) {
+          for (const validatorName in config.validate) {
+            if (
+              !Object.prototype.hasOwnProperty.call(
+                config.validate,
+                validatorName
+              )
+            )
+              continue;
+            const definition = config.validate[validatorName];
+            validatorMap[dataType][validatorName] = definition.validator;
+            messageMap[dataType][validatorName] = definition.message;
+          }
+        }
+      }
+    }
+  }
 
-export const transformationMap = {
-  string: stringTransformations,
-};
+  return { validatorMap, preparationMap, transformationMap, messageMap };
+}
+
+export const { validatorMap, preparationMap, transformationMap, messageMap } =
+  mergePlugins(plugins);
