@@ -29,6 +29,23 @@ describe("Number Addon Validators", () => {
     });
   });
 
+  describe("coerce", () => {
+    it("should coerce a string to a number", async () => {
+      const schema = s.number({ preparations: { coerce: true } });
+      await expect(schema.parse("123")).resolves.toBe(123);
+    });
+
+    it("should not coerce an invalid string", async () => {
+      const schema = s.number({ preparations: { coerce: true } });
+      await expect(schema.parse("123a")).rejects.toThrow(ValidationError);
+    });
+
+    it("should not coerce when disabled", async () => {
+      const schema = s.number({ preparations: { coerce: false } });
+      await expect(schema.parse("123")).rejects.toThrow(ValidationError);
+    });
+  });
+
   describe("bigint", () => {
     it("should validate a correct bigint", async () => {
       const schema = s.bigint();
@@ -40,6 +57,28 @@ describe("Number Addon Validators", () => {
     it("should throw for a non-bigint", async () => {
       const schema = s.bigint();
       await expect((schema as any).parse(123)).rejects.toThrow(ValidationError);
+    });
+
+    describe("coerce", () => {
+      it("should coerce a string to a bigint", async () => {
+        const schema = s.bigint({ preparations: { coerce: true } });
+        await expect(schema.parse("123")).resolves.toBe(BigInt(123));
+      });
+
+      it("should coerce a number to a bigint", async () => {
+        const schema = s.bigint({ preparations: { coerce: true } });
+        await expect(schema.parse(123)).resolves.toBe(BigInt(123));
+      });
+
+      it("should not coerce an invalid string", async () => {
+        const schema = s.bigint({ preparations: { coerce: true } });
+        await expect(schema.parse("123a")).rejects.toThrow(ValidationError);
+      });
+
+      it("should not coerce when disabled", async () => {
+        const schema = s.bigint({ preparations: { coerce: false } });
+        await expect(schema.parse("123")).rejects.toThrow(ValidationError);
+      });
     });
   });
 

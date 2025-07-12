@@ -1,7 +1,10 @@
 import { Intersect, UnionToIntersection } from "./utils.js";
 import { arrayValidatorMap } from "./validators/array.js";
-import { booleanValidatorMap } from "./validators/boolean.js";
-import { numberValidatorMap } from "./validators/number.js";
+import {
+  booleanValidatorMap,
+  booleanPreparations,
+} from "./validators/boolean.js";
+import { numberValidatorMap, numberPreparations } from "./validators/number.js";
 import { objectValidatorMap } from "./validators/object.js";
 import {
   stringValidatorMap,
@@ -11,7 +14,7 @@ import {
 import { SchemaValidatorMap } from "./validators/types.js";
 import { dateValidatorMap, datePreparations } from "./validators/date.js";
 import { anyValidatorMap } from "./validators/any.js";
-import { bigintValidatorMap } from "./validators/bigint.js";
+import { bigintValidatorMap, bigintPreparations } from "./validators/bigint.js";
 import { nanValidatorMap } from "./validators/nan.js";
 import { unknownValidatorMap } from "./validators/unknown.js";
 import { neverValidatorMap } from "./validators/never.js";
@@ -57,6 +60,9 @@ export const validatorMap: MergedValidators = {
 export const preparationMap = {
   string: stringPreparations,
   date: datePreparations,
+  number: numberPreparations,
+  bigint: bigintPreparations,
+  boolean: booleanPreparations,
 };
 
 export const transformationMap = {

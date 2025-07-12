@@ -1,4 +1,24 @@
-import { SchemaValidatorMap, ValidatorCollection } from "./types.js";
+import {
+  SchemaValidatorMap,
+  ValidatorCollection,
+  PreparationCollection,
+} from "./types.js";
+
+const numberRegex = /^-?\d+(\.\d+)?$/;
+
+export const numberPreparations = {
+  coerce: (value: unknown, [enabled]: [boolean?]) => {
+    if (enabled === false) {
+      return value;
+    }
+
+    if (typeof value === "string" && numberRegex.test(value)) {
+      return parseFloat(value);
+    }
+
+    return value;
+  },
+} satisfies PreparationCollection<number>;
 
 export const numberValidatorMap = {
   number: {
