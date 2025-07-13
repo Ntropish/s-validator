@@ -1,80 +1,139 @@
-# Extensibility: Creating Custom Validators
+# Extensibility: The Plugin System
 
-`s-validator` is designed to be fully extensible. While the built-in validators cover most common use cases, you can add your own reusable validation logic that feels just as integrated as the built-in types.
+`s-validator` is designed with a powerful and flexible plugin system that allows you to add new validators or extend existing ones. This approach ensures that your custom logic can be seamlessly integrated and reused across your projects, with full TypeScript support.
 
-The best way to "extend" `s-validator` is to create a new, enhanced `s` object that includes all the standard validators plus your own. This provides the best developer experience, as your custom validator will be available as a method, like `s.myCustomValidator()`.
+The core of this system is the `createSValidator` function.
 
-This process has three steps:
+## The `createSValidator` Function
 
-1.  **Create a Validator Factory**: A function that encapsulates your custom logic and returns a configured `s-validator` schema.
-2.  **Create an Extended `s` Object**: A new object that combines the base `s-validator` with your new factory.
-3.  **Use Your Extended `s`**: Import your enhanced `s` object throughout your project.
-
-## Example: Creating and Integrating a `file` Validator
-
-Let's create and integrate a custom validator for the browser `File` object.
-
-### Step 1: Create the Validator Factory
-
-This function will contain the core logic for the validator. It takes a configuration object and returns a schema. We'll use `s.instanceof(File)` as a base and inject custom rules.
+Instead of using the default `s` export, you can create your own customized instance of `s-validator` by calling `createSValidator` with an array of plugins.
 
 ```typescript
-// validators/file.ts
-import {
-  s as baseS,
-  type CustomValidator,
-  type ValidatorConfig,
-  type ValidationContext,
-} from "s-validator";
+import { createSValidator } from "s-validator";
+import { myCustomPlugin, anotherPlugin } from "./plugins";
 
+export const s = createSValidator([myCustomPlugin, anotherPlugin]);
+
+// You can also re-export the infer type for convenience
+export { type infer } from "s-validator";
+```
+
+This new `s` object will have all the standard validators plus the custom functionality you've defined in your plugins.
+
+## The Plugin API
+
+A plugin is an object that specifies new preparations, validations, or transformations for a given `dataType`.
+
+Here is the basic structure of a plugin:
+
+```typescript
+export const myPlugin = {
+  dataType: "string", // The data type to extend (e.g., 'string', 'number')
+
+  // Add new validation rules
+  validate: {
+    isPositive: {
+      validator: (value: number) => value > 0,
+      message: ({ label }) => `${label} must be positive.`,
+    },
+  },
+
+  // Add new data preparations
+  prepare: {
+    trim: (value: string) => value.trim(),
+  },
+
+  // Add new data transformations
+  transform: {
+    addSalutation: (value: string) => `Mr./Ms. ${value}`,
+  },
+};
+```
+
+## Example 1: Extending an Existing Validator
+
+Let's create a plugin that adds an `isAwesome` check to the `s.string()` validator.
+
+#### 1. Define the Plugin
+
+```typescript
+// plugins/awesome-string.ts
+
+export const awesomeStringPlugin = {
+  dataType: "string",
+  validate: {
+    isAwesome: {
+      validator: (value: string) => value.includes("awesome"),
+      message: ({ label }) => `${label || "String"} must be awesome!`,
+    },
+  },
+};
+```
+
+#### 2. Create the Custom `s` Instance
+
+```typescript
+// lib/s.ts
+import { createSValidator } from "s-validator";
+import { awesomeStringPlugin } from "../plugins/awesome-string";
+
+export const s = createSValidator([awesomeStringPlugin]);
+export { type infer } from "s-validator";
+```
+
+#### 3. Use the Extended Validator
+
+Now you can import your custom `s` and use the new `.isAwesome()` method.
+
+```typescript
+import { s } from "../lib/s";
+
+const schema = s.string({
+  validate: {
+    isAwesome: true, // Use your custom rule!
+  },
+});
+
+schema.parse("this is awesome"); // -> "this is awesome"
+await schema.safeParse("this is not"); // -> { status: 'error', ... }
+```
+
+## Example 2: Creating a New Validator
+
+The plugin system can also be used to create entirely new, first-class validator types. Let's create an `s.file()` validator for the browser `File` object.
+
+This is a more advanced use case that involves creating a new schema within the plugin.
+
+#### 1. Define the Plugin and Factory Function
+
+```typescript
+// plugins/file.ts
+import { s as baseS, Schema, ValidatorConfig, Plugin } from "s-validator";
+
+// Define the config for our new validator
 type FileValidatorConfig = {
   validate?: {
     maxSize?: number; // in bytes
     allowedTypes?: string[]; // MIME types
   };
-  messages?: {
-    maxSize?: string;
-    allowedTypes?: string;
-  };
-} & Omit<ValidatorConfig<File>, "validate" | "messages">;
+} & ValidatorConfig<File>;
 
-export const file = (config: FileValidatorConfig = {}) => {
-  const customValidators: CustomValidator<File>[] = [];
-
-  const addCustomValidator = (
-    name: string,
-    validator: (
-      value: File,
-      context: ValidationContext & {
-        addError: (issue: { message: string }) => void;
-      }
-    ) => void
-  ) => {
-    customValidators.push({ name, validator: validator as any });
-  };
+// Create a factory function that returns a pre-configured schema
+function fileValidator(config: FileValidatorConfig = {}): Schema<File> {
+  const customValidators = [];
 
   if (config.validate?.maxSize !== undefined) {
-    addCustomValidator("maxSize", (value, context) => {
-      if (value.size > config.validate!.maxSize!) {
-        context.addError({
-          message:
-            config.messages?.maxSize ||
-            `File size must not exceed ${config.validate!.maxSize!} bytes.`,
-        });
-      }
-    });
+    customValidators.push(
+      baseS.custom((file: File) => file.size <= config.validate!.maxSize!)
+    );
   }
 
   if (config.validate?.allowedTypes) {
-    addCustomValidator("allowedTypes", (value, context) => {
-      if (!config.validate!.allowedTypes!.includes(value.type)) {
-        context.addError({
-          message:
-            config.messages?.allowedTypes ||
-            `File type "${value.type}" is not allowed.`,
-        });
-      }
-    });
+    customValidators.push(
+      baseS.custom((file: File) =>
+        config.validate!.allowedTypes!.includes(file.type)
+      )
+    );
   }
 
   return baseS.instanceof(File, {
@@ -88,55 +147,49 @@ export const file = (config: FileValidatorConfig = {}) => {
       identity: "Input must be a File object.",
     },
   });
+}
+
+// Define the plugin to add the 'file' property
+export const filePlugin = {
+  file: fileValidator,
 };
 ```
 
-### Step 2: Create the Extended `s` Object
+#### 2. Create the Custom `s` Instance
 
-Now, create a central file (e.g., `lib/s.ts`) where you'll export your enhanced `s` object. This makes your custom validators available everywhere.
+Here, instead of passing a plugin to `createSValidator`, we can `Object.assign` to add our new validator to the base `s` object. This is a simpler approach for adding new validator types.
 
 ```typescript
 // lib/s.ts
 import { s as baseS } from "s-validator";
-import { file } from "../validators/file"; // Adjust the import path
+import { filePlugin } from "../plugins/file";
 
-// s-validator's 's' is a function with properties.
-// Use Object.assign to preserve its original nature while adding your own.
-export const s = Object.assign(baseS, {
-  file,
-  // Add other custom validators here
-});
-
-// It's also a good idea to re-export the infer type for convenience
-export type infer<T> = baseS.infer<T>;
+export const s = Object.assign(baseS, filePlugin);
+export { type infer } from "s-validator";
 ```
 
-### Step 3: Use Your Extended Validator
+#### 3. Use the New Validator
 
-Finally, in your application code, import from your local `s` file instead of directly from `s-validator`. Now you can use `s.file()` as if it were a built-in method.
+You can now use `s.file()` just like any other built-in validator.
 
 ```typescript
-import { s, infer } from '../lib/s'; // Use your local, extended 's'
+import { s } from "../lib/s";
 
-// Example: Validating a user profile with an avatar upload
 const userProfileSchema = s.object({
   validate: {
     properties: {
       username: s.string(),
-      avatar: s.file({ // Your custom validator in action!
-        validate: {
-          maxSize: 1024 * 1024, // 1MB
-          allowedTypes: ['image/jpeg', 'image/png'],
-        },
-        messages: {
-          maxSize: 'Avatar must be smaller than 1MB.',
-        },
-      }).optional(),
-    }
-  }
+      avatar: s
+        .file({
+          validate: {
+            maxSize: 1024 * 1024, // 1MB
+            allowedTypes: ["image/jpeg", "image/png"],
+          },
+        })
+        .optional(),
+    },
+  },
 });
-
-type UserProfile = infer<typeof userProfileSchema>;
 ```
 
-This pattern provides true, seamless extensibility for your projects.
+This pattern provides true, seamless extensibility for your projects, allowing you to build a validation library perfectly tailored to your needs.
