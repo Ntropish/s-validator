@@ -37,25 +37,14 @@ In a sea of validation libraries, `s-validator` stands out by focusing on a few 
 
 ```mermaid
 graph TD
-    A[Input Data] --> PREPARE;
-    PREPARE --> VALIDATE;
-    VALIDATE --> TRANSFORM;
-    TRANSFORM --> O[Output Data];
+    A[Input Data] --> P["<b>1. Preparation</b><br>Coerce types (string to Date)<br>Trim strings<br>Apply defaults"];
+    P --> V["<b>2. Validation</b><br>Check lengths/ranges<br>Validate formats (email, URL)<br>Run custom rules"];
+    V --> T["<b>3. Transformation</b><br>Change data shape<br>Format values<br>Add or remove fields"];
+    T --> O[Output Data];
 
-    subgraph PREPARE [1. Preparation]
-        P1["Coerce types (string to Date)<br>Trim strings<br>Apply defaults"]
-    end
-
-    subgraph VALIDATE [2. Validation]
-        V1["Check lengths/ranges<br>Validate formats (email, URL)<br>Run custom rules"]
-    end
-
-    subgraph TRANSFORM [3. Transformation]
-       T1["Change data shape<br>Format values<br>Add or remove fields"]
-    end
-
-    classDef phase fill:#eee,stroke:#333,stroke-width:2px;
-    class PREPARE,VALIDATE,TRANSFORM phase;
+    style P fill:#f9f9f9,stroke:#333,stroke-width:2px,color:#333
+    style V fill:#f9f9f9,stroke:#333,stroke-width:2px,color:#333
+    style T fill:#f9f9f9,stroke:#333,stroke-width:2px,color:#333
 ```
 
 1.  **Preparation**: The raw input is recursively traversed, and preparation functions are run. This is ideal for coercing data into the correct type _before_ validation, such as converting a `Date` string to a `Date` object or trimming a string.
