@@ -43,15 +43,15 @@ graph TD
     TRANSFORM --> O[Output Data];
 
     subgraph PREPARE [1. Preparation]
-        P1["- Coerce types (string to Date)<br>- Trim strings<br>- Apply defaults"]
+        P1["Coerce types (string to Date)<br>Trim strings<br>Apply defaults"]
     end
 
     subgraph VALIDATE [2. Validation]
-        V1["- Check lengths/ranges<br>- Validate formats (email, URL)<br>- Run custom rules"]
+        V1["Check lengths/ranges<br>Validate formats (email, URL)<br>Run custom rules"]
     end
 
     subgraph TRANSFORM [3. Transformation]
-       T1["- Change data shape<br>- Format values<br>- Add or remove fields"]
+       T1["Change data shape<br>Format values<br>Add or remove fields"]
     end
 
     classDef phase fill:#eee,stroke:#333,stroke-width:2px;
