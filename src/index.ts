@@ -184,7 +184,7 @@ function createSchemaBuilder(): Builder {
       ) => {
         return new Schema("instanceof", {
           ...config,
-          validate: { ...(config as any).validate, constructor: constructor },
+          validate: { ...(config as any).validate, identity: constructor },
         });
       };
       continue;

@@ -67,12 +67,20 @@ export class Schema<TOutput, TInput = TOutput>
     const preparationCollection = (preparationMap as any)[dataType];
     const transformationCollection = (transformationMap as any)[dataType];
 
+    const validationRules = { ...(validate || {}), ...rest };
+
     if (validatorCollection?.identity) {
+      const identityArgs = (validationRules as any).identity;
       this.validators.push({
         name: "identity",
         validator: validatorCollection.identity,
-        args: [],
+        args: Array.isArray(identityArgs)
+          ? identityArgs
+          : identityArgs !== undefined
+          ? [identityArgs]
+          : [],
       });
+      delete (validationRules as any).identity;
     }
 
     if (prepare) {
@@ -91,7 +99,6 @@ export class Schema<TOutput, TInput = TOutput>
       }
     }
 
-    const validationRules = { ...(validate || {}), ...rest };
     if (validationRules) {
       for (let [valName, valConfig] of Object.entries(validationRules)) {
         if (valName === "custom") {
@@ -199,36 +206,14 @@ export class Schema<TOutput, TInput = TOutput>
         this
       ))
     ) {
-      const messageProducerContext: MessageProducerContext = {
-        label: this.label,
-        value: current_value,
-        path: context.path,
-        dataType: this.dataType,
-        ctx: context.ctx,
-        args: [],
-        schema: this,
-      };
-
-      let message: string | undefined;
-      const userMessage = messages["identity"];
-
-      if (typeof userMessage === "string") {
-        message = userMessage;
-      } else if (typeof userMessage === "function") {
-        message = (userMessage as MessageProducer)(messageProducerContext);
-      } else {
-        const defaultMessageProducer = (messageMap as any)[this.dataType]?.[
-          "identity"
-        ];
-        if (defaultMessageProducer) {
-          message = defaultMessageProducer(messageProducerContext);
-        }
-      }
-
-      issues.push({
-        path: context.path,
-        message: message ?? `Validation failed for ${this.dataType}.identity`,
-      });
+      issues.push(
+        this._createIssue(
+          "identity",
+          [],
+          { ...context, value: current_value },
+          messages.identity
+        )
+      );
 
       // If identity fails, no other validators should run for this schema
       if (issues.length > 0) {
@@ -248,43 +233,15 @@ export class Schema<TOutput, TInput = TOutput>
             this
           ))
         ) {
-          const messageProducerContext: MessageProducerContext = {
-            label: this.label,
-            value: current_value,
-            path: context.path,
-            dataType: this.dataType,
-            ctx: context.ctx,
-            args,
-            schema: this,
-          };
-
-          let message: string | undefined;
-          const userMessage = messages[name];
-
-          if (typeof userMessage === "string") {
-            message = userMessage;
-          } else if (typeof userMessage === "function") {
-            message = (userMessage as MessageProducer)(messageProducerContext);
-          } else {
-            const defaultMessageProducer = (messageMap as any)[this.dataType]?.[
-              name
-            ];
-            if (defaultMessageProducer) {
-              message = defaultMessageProducer(messageProducerContext);
-            }
-          }
-
-          issues.push({
-            path: context.path,
-            message:
-              message ?? `Validation failed for ${this.dataType}.${name}`,
-          });
+          issues.push(
+            this._createIssue(name, args, { ...context, value: current_value })
+          );
         }
-      } catch (e) {
-        if (e instanceof ValidationError) {
-          issues.push(...e.issues);
+      } catch (error) {
+        if (error instanceof ValidationError) {
+          issues.push(...error.issues);
         } else {
-          throw e;
+          throw error;
         }
       }
     }
@@ -358,6 +315,47 @@ export class Schema<TOutput, TInput = TOutput>
     }
 
     return current_value;
+  }
+
+  private _createIssue(
+    name: string,
+    args: any[],
+    context: ValidationContext,
+    customMessage?: string | MessageProducer
+  ): ValidationIssue {
+    const messageProducerContext: MessageProducerContext = {
+      label: this.label,
+      value: context.value,
+      path: context.path,
+      dataType: this.dataType,
+      ctx: context.ctx,
+      args,
+      schema: this,
+    };
+
+    let message: string | undefined;
+
+    const userMessage =
+      customMessage ??
+      (this.config as ValidatorConfig<any>).messages?.[
+        name as keyof ValidatorConfig<any>["messages"]
+      ];
+
+    if (typeof userMessage === "string") {
+      message = userMessage;
+    } else if (typeof userMessage === "function") {
+      message = (userMessage as MessageProducer)(messageProducerContext);
+    } else {
+      const defaultMessageProducer = (messageMap as any)[this.dataType]?.[name];
+      if (defaultMessageProducer) {
+        message = defaultMessageProducer(messageProducerContext);
+      }
+    }
+
+    return {
+      path: context.path,
+      message: message ?? `Validation failed for ${this.dataType}.${name}`,
+    };
   }
 
   public async _transform(

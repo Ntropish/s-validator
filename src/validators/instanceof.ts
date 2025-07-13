@@ -1,24 +1,27 @@
 import { definePlugin } from "../types.js";
 
-type Class = new (...args: any[]) => any;
-
 export const instanceofPlugin = definePlugin({
   dataType: "instanceof",
   validate: {
     identity: {
-      validator: (value: unknown): value is object => {
-        return typeof value === "object" && value !== null;
-      },
-      message: (ctx) =>
-        `Invalid type. Expected object, received ${typeof ctx.value}.`,
-    },
-    constructor: {
-      validator: (value: unknown, [constructor]: [Class]): value is any => {
+      validator: (
+        value: unknown,
+        [constructor]: [new (...args: any[]) => any]
+      ) => {
         return value instanceof constructor;
       },
       message: (ctx) => {
-        const constructorName = (ctx.args[0] as Class)?.name || "Unknown";
-        return `Value must be an instance of ${constructorName}.`;
+        const constructor = ctx.args[0] as
+          | (new (...args: any[]) => any)
+          | undefined;
+        const constructorName = constructor?.name ?? "Unknown";
+        const valueName =
+          ctx.value === null
+            ? "null"
+            : typeof ctx.value === "object"
+            ? (ctx.value as object).constructor.name
+            : typeof ctx.value;
+        return `Invalid type. Expected instance of ${constructorName}, received ${valueName}.`;
       },
     },
   },
