@@ -134,4 +134,85 @@ describe("Switch Validator", () => {
       await expect(schema.parse("s")).rejects.toThrow();
     });
   });
+
+  describe("Top-level modifiers", () => {
+    it("should apply top-level preparations", async () => {
+      const schema = s.switch({
+        select: (c) => c.value.key,
+        cases: {
+          a: s.object({
+            validate: { properties: { value: s.number() } },
+          }),
+        },
+        prepare: {
+          custom: [
+            (data) => {
+              if (typeof data.value === "string") {
+                return { ...data, value: Number(data.value) };
+              }
+              return data;
+            },
+          ],
+        },
+      });
+
+      const input = { key: "a", value: "123" };
+      const expected = { key: "a", value: 123 };
+      await expect(schema.parse(input)).resolves.toEqual(expected);
+    });
+
+    it("should apply top-level transformations", async () => {
+      const schema = s.switch({
+        select: (c) => c.value.key,
+        cases: {
+          a: s.object({
+            validate: { properties: { value: s.number() } },
+          }),
+        },
+        transform: {
+          custom: [
+            (data) => {
+              return { ...data, transformed: true };
+            },
+          ],
+        },
+      });
+
+      const input = { key: "a", value: 123 };
+      const expected = { key: "a", value: 123, transformed: true };
+      await expect(schema.parse(input)).resolves.toEqual(expected);
+    });
+
+    it("should apply top-level validations with custom messages", async () => {
+      const customMessage = "Top-level validation failed";
+      const schema = s.switch({
+        select: (c) => c.value.key,
+        cases: {
+          a: s.object({
+            validate: { properties: { value: s.number() } },
+          }),
+        },
+        validate: {
+          custom: [
+            {
+              name: "top_level_check",
+              validator: (data) => data.value > 100,
+            },
+          ],
+        },
+        messages: {
+          top_level_check: customMessage,
+        },
+      });
+
+      await expect(
+        schema.parse({ key: "a", value: 101 })
+      ).resolves.not.toThrow();
+      const result = await schema.safeParse({ key: "a", value: 99 });
+      expect(result.status).toBe("error");
+      if (result.status === "error") {
+        expect(result.error.issues[0].message).toBe(customMessage);
+      }
+    });
+  });
 });

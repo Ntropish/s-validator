@@ -1,7 +1,7 @@
-import { ValidationContext, ValidationError } from "../types";
+import { ValidationContext, ValidationError, ValidatorConfig } from "../types";
 import { Schema } from "./schema.js";
 
-export type SwitchConfig = {
+export type SwitchConfig = ValidatorConfig<any> & {
   select: (context: ValidationContext) => any;
   cases: Record<string | number, Schema<any, any>>;
   default?: Schema<any, any>;
@@ -40,10 +40,11 @@ export class SwitchSchema extends Schema<any> {
   }
 
   async _validate(value: any, context: ValidationContext): Promise<any> {
-    const caseSchema = this.selectCase(context);
+    const validatedValue = await super._validate(value, context);
+    const caseSchema = this.selectCase({ ...context, value: validatedValue });
 
     if (caseSchema) {
-      return await caseSchema._validate(value, context);
+      return await caseSchema._validate(validatedValue, context);
     }
 
     const { failOnNoMatch } = this.config as SwitchConfig;
