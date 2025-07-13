@@ -1084,34 +1084,41 @@ class Schema {
       }
     }
     for (const customValidator of this.customValidators) {
-      const result = typeof customValidator === "function" ? await customValidator(current_value, {
-        ...context,
-        value: current_value
-      }) : await customValidator.validator(current_value, {
-        ...context,
-        value: current_value
-      });
-      if (!result) {
-        let message;
-        if (typeof customValidator === "object" && customValidator.message) {
-          if (typeof customValidator.message === "string") {
-            message = customValidator.message;
+      const customValidatorFn = typeof customValidator === "object" ? customValidator.validator : customValidator;
+      const customMessage = typeof customValidator === "object" ? customValidator.message : void 0;
+      const customValidatorName = typeof customValidator === "object" ? customValidator.name : void 0;
+      if (!await customValidatorFn(
+        current_value,
+        [],
+        { ...context, value: current_value },
+        this
+      )) {
+        const messageProducerContext = {
+          label: this.label,
+          value: current_value,
+          path: context.path,
+          dataType: this.dataType,
+          ctx: context.ctx,
+          args: [],
+          schema: this
+        };
+        let message = typeof customMessage === "function" ? customMessage(messageProducerContext) : customMessage;
+        if (!message) {
+          const userMessage = messages[customValidatorName] ?? messages["custom"];
+          if (typeof userMessage === "string") {
+            message = userMessage;
+          } else if (typeof userMessage === "function") {
+            message = userMessage(messageProducerContext);
           } else {
-            message = customValidator.message({
-              label: this.label,
-              value: current_value,
-              path: context.path,
-              dataType: this.dataType,
-              ctx: context.ctx,
-              args: [],
-              // Custom validators don't have 'args' in the same way
-              schema: this
-            });
+            const defaultMessageProducer = messageMap[this.dataType]?.["custom"];
+            if (defaultMessageProducer) {
+              message = defaultMessageProducer(messageProducerContext);
+            }
           }
         }
         issues.push({
           path: context.path,
-          message: message ?? `Custom validation failed for ${this.dataType}`
+          message: message ?? `Custom validation failed for ${customValidatorName ?? this.dataType}`
         });
       }
     }
@@ -1216,9 +1223,10 @@ class SwitchSchema extends Schema {
     return preparedValue;
   }
   async _validate(value, context) {
-    const caseSchema = this.selectCase(context);
+    const validatedValue = await super._validate(value, context);
+    const caseSchema = this.selectCase({ ...context, value: validatedValue });
     if (caseSchema) {
-      return await caseSchema._validate(value, context);
+      return await caseSchema._validate(validatedValue, context);
     }
     const { failOnNoMatch } = this.config;
     if (failOnNoMatch) {
@@ -1410,29 +1418,40 @@ class ObjectSchema extends Schema {
       throw new ValidationError(issues);
     }
     for (const customValidator of this.customValidators) {
-      const result = typeof customValidator === "function" ? await customValidator(newValue, {
-        ...context,
-        value: newValue
-      }) : await customValidator.validator(newValue, {
-        ...context,
-        value: newValue
-      });
-      if (!result) {
-        let message;
-        if (typeof customValidator === "object" && customValidator.message) {
-          message = typeof customValidator.message === "string" ? customValidator.message : customValidator.message({
-            label: this.label,
-            value: newValue,
-            path: context.path,
-            dataType: this.dataType,
-            ctx: context.ctx,
-            args: [],
-            schema: this
-          });
+      const customValidatorFn = typeof customValidator === "object" ? customValidator.validator : customValidator;
+      const customMessage = typeof customValidator === "object" ? customValidator.message : void 0;
+      const customValidatorName = typeof customValidator === "object" ? customValidator.name : void 0;
+      if (!await customValidatorFn(
+        newValue,
+        [],
+        {
+          ...context,
+          value: newValue
+        },
+        this
+      )) {
+        const messages = this.config.messages ?? {};
+        const messageProducerContext = {
+          label: this.label,
+          value: newValue,
+          path: context.path,
+          dataType: this.dataType,
+          ctx: context.ctx,
+          args: [],
+          schema: this
+        };
+        let message = typeof customMessage === "function" ? customMessage(messageProducerContext) : customMessage;
+        if (!message) {
+          const userMessage = messages[customValidatorName] ?? messages["custom"];
+          if (typeof userMessage === "string") {
+            message = userMessage;
+          } else if (typeof userMessage === "function") {
+            message = userMessage(messageProducerContext);
+          }
         }
         issues.push({
           path: context.path,
-          message: message ?? `Custom validation failed for ${this.dataType}`
+          message: message ?? `Custom validation failed for ${customValidatorName ?? this.dataType}`
         });
       }
     }
@@ -1619,17 +1638,26 @@ class SetSchema extends Schema {
 
 class UnionSchema extends Schema {
   variants;
-  constructor(variants, config) {
+  constructor(config) {
     super("union", config);
-    this.variants = variants;
+    if (!config.validate?.of) {
+      throw new Error(
+        "Union schema must have variants provided in `validate.of`"
+      );
+    }
+    this.variants = config.validate.of;
   }
   async _validate(value, context) {
     const issues = [];
+    let successfulResult = void 0;
+    let matched = false;
     for (const variant of this.variants) {
       try {
         const result = await variant.safeParse(value, context.ctx);
         if (result.status === "success") {
-          return result.data;
+          successfulResult = result.data;
+          matched = true;
+          break;
         } else {
           issues.push(...result.error.issues);
         }
@@ -1641,13 +1669,21 @@ class UnionSchema extends Schema {
         }
       }
     }
-    if (issues.length > 0) {
-      throw new ValidationError(issues);
+    if (matched) {
+      return successfulResult;
     }
-    return await super._validate(value, context);
+    try {
+      await super._validate(value, context);
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        throw new ValidationError([...error.issues, ...issues]);
+      }
+      throw error;
+    }
+    throw new ValidationError(issues);
   }
   async _transform(value, context) {
-    return value;
+    return super._transform(value, context);
   }
 }
 
@@ -1741,8 +1777,8 @@ function createSchemaBuilder() {
       continue;
     }
     if (plugin.dataType === "union") {
-      builder.union = (variants, config = {}) => {
-        return new UnionSchema(variants, config);
+      builder.union = (config = {}) => {
+        return new UnionSchema(config);
       };
       continue;
     }

@@ -4,6 +4,8 @@
 
 `s-val` provides a straightforward and declarative API for building validation schemas, ensuring your data conforms to the required structure and types without any external dependencies.
 
+![cover image](./cover.webp)
+
 ## Features
 
 - **Zero Dependencies:** Lightweight and easy to integrate.

@@ -5,7 +5,7 @@ import { Schema } from './schemas/schema.js';
 import { ArraySchema } from './schemas/array.js';
 import { ObjectSchema } from './schemas/object.js';
 import { SetSchema } from './schemas/set.js';
-import { UnionSchema } from './schemas/union.js';
+import { UnionSchema, UnionValidatorConfig } from './schemas/union.js';
 export { SwitchSchema, Schema };
 type Builder = {
     [P in Exclude<(typeof plugins)[number], {
@@ -27,7 +27,7 @@ type Builder = {
             ofType?: T;
         };
     }): SetSchema<T, TOutput, TInput>;
-    union<T extends readonly [Schema<any, any>, ...Schema<any, any>[]], TOutput = InferSchemaType<T[number]>, TInput = InferSchemaType<T[number]>>(variants: T, config?: ValidatorConfig<TOutput>): UnionSchema<T, TOutput, TInput>;
+    union<T extends readonly [Schema<any, any>, ...Schema<any, any>[]], TOutput = InferSchemaType<T[number]>, TInput = InferSchemaType<T[number]>>(config: UnionValidatorConfig<T, TOutput>): UnionSchema<T, TOutput, TInput>;
     instanceof<T>(constructor: new (...args: any[]) => T, config?: ValidatorConfig<T>): Schema<T>;
     lazy<T extends Schema<any, any>>(resolver: () => T): T;
 };

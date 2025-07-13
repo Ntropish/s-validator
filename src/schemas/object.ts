@@ -127,36 +127,61 @@ export class ObjectSchema<
 
     // Now, with a fully parsed and transformed object, run the custom validators.
     for (const customValidator of this.customValidators) {
-      const result =
-        typeof customValidator === "function"
-          ? await customValidator(newValue as T, {
-              ...context,
-              value: newValue,
-            })
-          : await customValidator.validator(newValue as T, {
-              ...context,
-              value: newValue,
-            });
+      const customValidatorFn =
+        typeof customValidator === "object"
+          ? customValidator.validator
+          : customValidator;
+      const customMessage =
+        typeof customValidator === "object"
+          ? customValidator.message
+          : undefined;
+      const customValidatorName =
+        typeof customValidator === "object" ? customValidator.name : undefined;
 
-      if (!result) {
-        let message: string | undefined;
-        if (typeof customValidator === "object" && customValidator.message) {
-          message =
-            typeof customValidator.message === "string"
-              ? customValidator.message
-              : (customValidator.message as MessageProducer)({
-                  label: this.label,
-                  value: newValue,
-                  path: context.path,
-                  dataType: this.dataType,
-                  ctx: context.ctx,
-                  args: [],
-                  schema: this,
-                });
+      if (
+        !(await customValidatorFn(
+          newValue as T,
+          [],
+          {
+            ...context,
+            value: newValue,
+          },
+          this
+        ))
+      ) {
+        const messages = (this.config as ValidatorConfig<any>).messages ?? {};
+        const messageProducerContext = {
+          label: this.label,
+          value: newValue,
+          path: context.path,
+          dataType: this.dataType,
+          ctx: context.ctx,
+          args: [],
+          schema: this,
+        };
+
+        let message: string | undefined =
+          typeof customMessage === "function"
+            ? customMessage(messageProducerContext)
+            : customMessage;
+
+        if (!message) {
+          const userMessage =
+            messages[customValidatorName as keyof typeof messages] ??
+            messages["custom"];
+          if (typeof userMessage === "string") {
+            message = userMessage;
+          } else if (typeof userMessage === "function") {
+            message = (userMessage as MessageProducer)(messageProducerContext);
+          }
         }
         issues.push({
           path: context.path,
-          message: message ?? `Custom validation failed for ${this.dataType}`,
+          message:
+            message ??
+            `Custom validation failed for ${
+              customValidatorName ?? this.dataType
+            }`,
         });
       }
     }

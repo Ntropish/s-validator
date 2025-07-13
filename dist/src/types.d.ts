@@ -86,9 +86,10 @@ export type UndefinedToOptional<T> = Prettify<{
 } & {
     [K in UndefinedKeys<T>]?: T[K];
 }>;
-export type CustomValidator<T> = ((value: T, context: ValidationContext) => boolean | Promise<boolean>) | {
-    validator: (value: T, context: ValidationContext) => boolean | Promise<boolean>;
-    message?: string;
+export type CustomValidator<TOutput> = ((value: TOutput, args: any[], context: ValidationContext, schema: any) => any) | {
+    validator: (value: TOutput, args: any[], context: ValidationContext, schema: any) => any;
+    message?: string | MessageProducer;
+    name?: string;
 };
 export type ValidatorConfig<VCollection> = {
     optional?: boolean;
