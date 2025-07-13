@@ -1,101 +1,142 @@
-# Extensibility: Creating Custom Schemas
+# Extensibility: Creating Custom Validators
 
-`s-validator` is designed to be fully extensible. While the built-in validators cover most common use cases, you may have custom validation logic that you want to encapsulate and reuse. The best way to do this is by creating your own schema class that extends the base `s.Schema`.
+`s-validator` is designed to be fully extensible. While the built-in validators cover most common use cases, you can add your own reusable validation logic that feels just as integrated as the built-in types.
 
-## The `Schema` Class
+The best way to "extend" `s-validator` is to create a new, enhanced `s` object that includes all the standard validators plus your own. This provides the best developer experience, as your custom validator will be available as a method, like `s.myCustomValidator()`.
 
-The `s.Schema` class is the foundation for all validators in `s-validator`. By extending it, you can create a new validator with its own `_validate` and `_transform` logic, while inheriting all the powerful features of the base schema, like `.optional()`, `.nullable()`, custom messages, and more.
+This process has three steps:
 
-## Example: Creating a `PhoneNumberSchema`
+1.  **Create a Validator Factory**: A function that encapsulates your custom logic and returns a configured `s-validator` schema.
+2.  **Create an Extended `s` Object**: A new object that combines the base `s-validator` with your new factory.
+3.  **Use Your Extended `s`**: Import your enhanced `s` object throughout your project.
 
-Let's create a custom schema that validates and formats a US phone number. We want it to:
+## Example: Creating and Integrating a `file` Validator
 
-1. Accept a 10-digit string.
-2. Format it into a standard `(XXX) XXX-XXXX` string.
+Let's create and integrate a custom validator for the browser `File` object.
 
-### 1. Define the Custom Schema Class
+### Step 1: Create the Validator Factory
 
-Create a new file, for example, `phone-number-schema.ts`. In this file, you'll define your new schema class.
-
-```typescript
-import { s, ValidationError, type ValidationContext } from "s-validator";
-
-const PHONE_REGEX = /^\d{10}$/;
-
-export class PhoneNumberSchema extends s.Schema<string, string> {
-  constructor() {
-    // The first argument is the data type name, used in error messages.
-    super("phoneNumber");
-  }
-
-  // The _validate method checks the input after basic type checks.
-  // It should throw a ValidationError on failure and return void on success.
-  async _validate(value: any, context: ValidationContext): Promise<void> {
-    // First, run the base validation from s.Schema (handles optional, nullable, etc.)
-    await super._validate(value, context);
-
-    if (typeof value !== "string" || !PHONE_REGEX.test(value)) {
-      throw new ValidationError([
-        {
-          path: context.path,
-          message: "Must be a 10-digit phone number.",
-        },
-      ]);
-    }
-  }
-
-  // The _transform method runs after successful validation.
-  async _transform(value: string, context: ValidationContext): Promise<string> {
-    const transformedValue = await super._transform(value, context);
-
-    // Format the 10-digit string into a standard format.
-    return `(${transformedValue.slice(0, 3)}) ${transformedValue.slice(
-      3,
-      6
-    )}-${transformedValue.slice(6)}`;
-  }
-}
-```
-
-### 2. Create an Instance Function
-
-For a better developer experience, it's a good practice to create a small factory function that creates an instance of your new schema. This makes it feel like a built-in `s-validator` validator.
-
-You can add this to the same file or a central export file.
+This function will contain the core logic for the validator. It takes a configuration object and returns a schema. We'll use `s.instanceof(File)` as a base and inject custom rules.
 
 ```typescript
-// phoneNumber-schema.ts (continued)
+// validators/file.ts
+import {
+  s as baseS,
+  type CustomValidator,
+  type ValidatorConfig,
+  type ValidationContext,
+} from "s-validator";
 
-export function phoneNumber() {
-  return new PhoneNumberSchema();
-}
-```
+type FileValidatorConfig = {
+  validate?: {
+    maxSize?: number; // in bytes
+    allowedTypes?: string[]; // MIME types
+  };
+  messages?: {
+    maxSize?: string;
+    allowedTypes?: string;
+  };
+} & Omit<ValidatorConfig<File>, "validate" | "messages">;
 
-### 3. Use Your New Schema
+export const file = (config: FileValidatorConfig = {}) => {
+  const customValidators: CustomValidator<File>[] = [];
 
-Now you can import and use your custom `phoneNumber` schema just like any other `s-validator` validator.
+  const addCustomValidator = (
+    name: string,
+    validator: (
+      value: File,
+      context: ValidationContext & {
+        addError: (issue: { message: string }) => void;
+      }
+    ) => void
+  ) => {
+    customValidators.push({ name, validator: validator as any });
+  };
 
-```typescript
-import { phoneNumber } from "./phoneNumber-schema";
+  if (config.validate?.maxSize !== undefined) {
+    addCustomValidator("maxSize", (value, context) => {
+      if (value.size > config.validate!.maxSize!) {
+        context.addError({
+          message:
+            config.messages?.maxSize ||
+            `File size must not exceed ${config.validate!.maxSize!} bytes.`,
+        });
+      }
+    });
+  }
 
-const userSchema = s.object({
-  validate: {
-    properties: {
-      name: s.string(),
-      // Use your custom schema!
-      phone: phoneNumber(),
+  if (config.validate?.allowedTypes) {
+    addCustomValidator("allowedTypes", (value, context) => {
+      if (!config.validate!.allowedTypes!.includes(value.type)) {
+        context.addError({
+          message:
+            config.messages?.allowedTypes ||
+            `File type "${value.type}" is not allowed.`,
+        });
+      }
+    });
+  }
+
+  return baseS.instanceof(File, {
+    ...config,
+    validate: {
+      ...config.validate,
+      custom: customValidators,
     },
-  },
+    messages: {
+      ...config.messages,
+      identity: "Input must be a File object.",
+    },
+  });
+};
+```
+
+### Step 2: Create the Extended `s` Object
+
+Now, create a central file (e.g., `lib/s.ts`) where you'll export your enhanced `s` object. This makes your custom validators available everywhere.
+
+```typescript
+// lib/s.ts
+import { s as baseS } from "s-validator";
+import { file } from "../validators/file"; // Adjust the import path
+
+// s-validator's 's' is a function with properties.
+// Use Object.assign to preserve its original nature while adding your own.
+export const s = Object.assign(baseS, {
+  file,
+  // Add other custom validators here
 });
 
-const user = {
-  name: "John Doe",
-  phone: "1234567890",
-};
-
-const validatedUser = await userSchema.parse(user);
-
-console.log(validatedUser.phone); // -> "(123) 456-7890"
+// It's also a good idea to re-export the infer type for convenience
+export type infer<T> = baseS.infer<T>;
 ```
 
-By extending the `s.Schema` class, you can create powerful, reusable, and type-safe validators that are seamlessly integrated into the `s-validator` ecosystem.
+### Step 3: Use Your Extended Validator
+
+Finally, in your application code, import from your local `s` file instead of directly from `s-validator`. Now you can use `s.file()` as if it were a built-in method.
+
+```typescript
+import { s, infer } from '../lib/s'; // Use your local, extended 's'
+
+// Example: Validating a user profile with an avatar upload
+const userProfileSchema = s.object({
+  validate: {
+    properties: {
+      username: s.string(),
+      avatar: s.file({ // Your custom validator in action!
+        validate: {
+          maxSize: 1024 * 1024, // 1MB
+          allowedTypes: ['image/jpeg', 'image/png'],
+        },
+        messages: {
+          maxSize: 'Avatar must be smaller than 1MB.',
+        },
+      }).optional(),
+    }
+  }
+});
+
+type UserProfile = infer<typeof userProfileSchema>;
+```
+
+This pattern provides true, seamless extensibility for your projects.
