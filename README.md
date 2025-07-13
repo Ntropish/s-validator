@@ -1,5 +1,3 @@
-# s-validator
-
 **A simple, lightweight, and type-safe validation library for TypeScript and JavaScript.**
 
 `s-validator` provides a straightforward and declarative API for building validation schemas, ensuring your data conforms to the required structure and types without any external dependencies.
