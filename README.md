@@ -2,7 +2,7 @@
 
 `s-validator` provides a straightforward and declarative API for building validation schemas, ensuring your data conforms to the required structure and types without any external dependencies.
 
-![cover image](./cover.webp)
+![cover image](https://raw.githubusercontent.com/Ntropish/s-validator/refs/heads/main/cover.webp)
 
 ## Features
 
