@@ -5,15 +5,15 @@ export default defineConfig({
   build: {
     lib: {
       entry: "src/index.ts",
-      name: "SVal",
+      name: "SValidator",
       fileName: "index",
       formats: ["es", "cjs"],
     },
     rollupOptions: {
-      external: ["vite"],
+      output: {
+        dir: "dist",
+      },
     },
-    target: "esnext",
-    minify: false,
   },
   plugins: [dts()],
 });
