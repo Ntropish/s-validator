@@ -1,6 +1,6 @@
 # Validator Reference
 
-This section provides a detailed API reference for all of the built-in validators available in `s-validator`.
+This section provides a detailed API reference for all of the built-in validators and utilities available in `s-validator`.
 
 ## Core Concepts
 
@@ -45,16 +45,18 @@ These are explained in more detail in the [main documentation](../index.md#modif
 
 ## Available Validators
 
-Validators are grouped by category.
-
 ### Primitives
 
 - [Any](./any.md)
 - [BigInt](./bigint.md)
 - [Boolean](./boolean.md)
 - [Date](./date.md)
+- [Literal](./literal.md)
+- [NaN](./nan.md)
+- [Never](./never.md)
 - [Number](./number.md)
 - [String](./string.md)
+- [Unknown](./unknown.md)
 
 ### Data Structures
 
@@ -64,15 +66,12 @@ Validators are grouped by category.
 - [Record](./record.md)
 - [Set](./set.md)
 
-### Composition & Logic
+### Logic & Composition
 
 - [InstanceOf](./instanceof.md)
 - [Switch](./switch.md)
 - [Union](./union.md)
 
-### Special Values
+### Utilities
 
-- [Literal](./literal.md)
-- [NaN](./nan.md)
-- [Never](./never.md)
-- [Unknown](./unknown.md)
+- [Lazy](./lazy.md)

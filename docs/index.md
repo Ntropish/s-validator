@@ -205,12 +205,55 @@ const validatedUser = await userSchema.parse(validUserData);
 processUser(validatedUser); // This is type-safe!
 ```
 
-## Next Steps
+## Documentation
 
-Now that you have the basics, you can dive deeper into the specific validators or learn how to create your own.
+### Getting Started
 
-- **[Validator Reference](./validators/index.md):** Detailed API for all built-in validators.
-- **[Extensibility](./extensibility.md):** Learn how to create custom validators.
+- **[Core Concepts](./index.md#core-concepts-the-three-phase-pipeline):** Understand the foundational three-phase pipeline (prepare, validate, transform).
+- **[Extensibility](./extensibility.md):** Learn how to create your own custom validators and transformers.
+
+### Schema Reference
+
+Schemas define the shape and rules of your data. For more details, see the **[Schema Reference Index](./schemas/index.md)**.
+
+- **[Base Schema](./schemas/schema.md):** The foundation for all schemas.
+- **[Object Schema](./schemas/object.md):** For validating complex objects.
+- **[Array Schema](./schemas/array.md):** For validating arrays of items.
+- **[Set Schema](./schemas/set.md):** For validating `Set` objects.
+- **[Union Schema](./schemas/union.md):** For combining multiple schemas.
+- **[Switch Schema](./schemas/switch.md):** For conditional validation.
+
+### Validator Reference
+
+Validators are the building blocks you use to create schemas. For a complete list, see the **[Validator Reference Index](./validators/index.md)**.
+
+#### General Purpose
+
+- `s.any()`: [Docs](./validators/any.md)
+- `s.unknown()`: [Docs](./validators/unknown.md)
+- `s.never()`: [Docs](./validators/never.md)
+- `s.lazy()`: [Docs](./validators/lazy.md)
+
+#### Primitives
+
+- `s.string()`: [Docs](./validators/string.md)
+- `s.number()`: [Docs](./validators/number.md)
+- `s.boolean()`: [Docs](./validators/boolean.md)
+- `s.bigint()`: [Docs](./validators/bigint.md)
+- `s.literal()`: [Docs](./validators/literal.md)
+- `s.nan()`: [Docs](./validators/nan.md)
+- `s.date()`: [Docs](./validators/date.md)
+
+#### Complex Types
+
+- `s.object()`: [Docs](./validators/object.md)
+- `s.array()`: [Docs](./validators/array.md)
+- `s.union()`: [Docs](./validators/union.md)
+- `s.switch()`: [Docs](./validators/switch.md)
+- `s.record()`: [Docs](./validators/record.md)
+- `s.map()`: [Docs](./validators/map.md)
+- `s.set()`: [Docs](./validators/set.md)
+- `s.instanceof()`: [Docs](./validators/instanceof.md)
 
 ## Advanced Topics
 

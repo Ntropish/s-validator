@@ -1,97 +1,44 @@
-# Number Validator
+# `s.number()`
 
-The `number` validator checks if a value is a number. It provides several properties for more specific numeric validations.
+The `number` validator checks if a value is a number.
 
 ## Preparation
 
 ### `coerce`
 
-A common use case is receiving numeric data as strings (e.g., from query parameters or form inputs). By setting `coerce: true` in the `prepare` object, you can automatically convert strings to numbers before validation.
+If `coerce` is `true`, `s.number()` will attempt to convert strings into numbers before validation.
 
 - **Type**: `boolean`
-- **Default**: `false`
+- **Example**: `s.number({ prepare: { coerce: true } })`
 
 ```typescript
 import { s } from "s-validator";
 
-const schema = s.number({
-  prepare: {
-    coerce: true, // "18" -> 18
-  },
-  validate: {
-    integer: true,
-    min: 18,
-  },
-});
+const schema = s.number({ prepare: { coerce: true } });
 
-await schema.parse("25"); // ✅ -> 25
-await schema.parse(18); // ✅ -> 18
-await schema.parse("17"); // ❌ (fails min validation)
+await schema.parse("123"); // ✅ -> 123
+await schema.parse("123a"); // ❌ (fails coercion)
 ```
 
-## Validation
+## Validation Rules
 
-All validation rules are passed inside a `validate` object in the configuration.
+All validation rules are passed inside a `validate` object.
 
-- `min: number`: Checks if the number is greater than or equal to the value.
-- `max: number`: Checks if the number is less than or equal to the value.
+### Comparison
+
 - `gt: number`: Checks if the number is strictly greater than the value.
 - `gte: number`: Checks if the number is greater than or equal to the value.
 - `lt: number`: Checks if the number is strictly less than the value.
 - `lte: number`: Checks if the number is less than or equal to the value.
-- `integer: boolean`: Checks if the number is an integer.
-- `positive: boolean`: Checks if the number is positive (> 0).
-- `negative: boolean`: Checks if the number is negative (< 0).
-- `multipleOf: number`: Checks if the number is a multiple of the value.
-- `even: boolean`: Checks if the number is even.
-- `odd: boolean`: Checks if the number is odd.
 
-**Range Example:**
+**Example:**
 
 ```typescript
-// Number must be between 5 and 10 (inclusive)
-const schema = s.number({ validate: { min: 5, max: 10 } });
+// Number must be greater than 5 and less than or equal to 10.
+const schema = s.number({ validate: { gt: 5, lte: 10 } });
 
 await schema.parse(7); // ✅
-await schema.parse(5); // ✅
-await schema.parse(4); // ❌
-await schema.parse(11); // ❌
-```
-
-**Type Example:**
-
-```typescript
-// Number must be a positive integer
-const schema = s.number({ validate: { positive: true, integer: true } });
-
 await schema.parse(10); // ✅
-await schema.parse(-10); // ❌
-await schema.parse(10.5); // ❌
-```
-
-## Transformation
-
-Use the `transform` object to modify the number _after_ it has been validated.
-
-**Example: Formatting as a currency string**
-
-```typescript
-const priceSchema = s.number({
-  prepare: { coerce: true },
-  validate: {
-    min: 0,
-  },
-  transform: {
-    custom: [
-      (value) =>
-        value.toLocaleString("en-US", {
-          style: "currency",
-          currency: "USD",
-        }),
-    ],
-  },
-});
-
-const price = await priceSchema.parse("49.99");
-console.log(price); // -> "$49.99"
+await schema.parse(5); // ❌
+await schema.parse(11); // ❌
 ```

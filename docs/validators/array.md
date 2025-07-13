@@ -1,13 +1,10 @@
-# Array Validator
+# `s.array()`
 
 The `array` validator checks if a value is an array and can validate its contents and properties.
 
 ## Usage
 
-You create an array schema by passing the item schema as the first argument to `s.array()`. The second argument is an optional configuration object for additional validation rules.
-
-- **Item Schema**: The schema to use for validating each element in the array.
-- **Config Object**: An object for validation rules like `minLength`, `maxLength`, etc.
+You create an array schema by passing the element schema as the first argument to `s.array()`.
 
 ```typescript
 import { s } from "s-validator";
@@ -27,34 +24,14 @@ try {
 
 ## Validation Rules
 
-All validation rules are placed within the `validate` object in the second argument.
-
-### `items` (For Tuples)
-
-To validate an array with a specific sequence of types (a tuple), use the `items` property. The array must have the same number of elements as the provided `schemas` array.
-
-- **Type**: `Schema[]`
-- **Example**: `s.array(s.any(), { validate: { items: [s.string(), s.number()] } })`
-
-```typescript
-// A tuple of [string, number]
-const tupleSchema = s.array(s.any(), {
-  validate: {
-    items: [s.string(), s.number()],
-  },
-});
-
-await tupleSchema.parse(["hello", 123]); // ✅
-await tupleSchema.parse(["hello", "world"]); // ❌ (second item must be a number)
-await tupleSchema.parse(["hello"]); // ❌ (must have exactly 2 items)
-```
+You can provide a configuration object as the second argument to `s.array()` for additional validation rules. All rules are placed within the `validate` object.
 
 ### Length Validation
 
 - `length: number`: Checks if the array has an exact number of elements.
 - `minLength: number`: Checks if the array has at least a minimum number of elements.
 - `maxLength: number`: Checks if the array has at most a maximum number of elements.
-- `nonEmpty: boolean`: A shorthand for `minLength: 1`.
+- `nonEmpty: true`: A shorthand for `minLength: 1`.
 
 **Example:**
 
@@ -77,7 +54,7 @@ await schema.parse([1, 2, 3, 4, 5]); // ❌
 
 - `contains: any`: Checks if the array contains the specified element.
 - `excludes: any`: Checks if the array does not contain the specified element.
-- `unique: boolean`: Checks if all elements in the array are unique.
+- `unique: true`: Checks if all elements in the array are unique.
 
 **Example:**
 

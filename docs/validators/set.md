@@ -1,38 +1,53 @@
-# Set Validator
+# `s.set()`
 
-The `set` validator checks if a value is a `Set` and validates its items against a provided schema.
+The `set` validator checks if a value is a `Set` and validates its elements against a provided schema.
 
 ## Usage
 
-You create a set schema by passing the item schema as the first argument to `s.set()`. The second argument is an optional configuration object.
-
-- **Item Schema**: The schema to use for validating each element in the set.
-- **Config Object**: An object for additional validation rules.
+You create a `set` schema by passing a configuration object to `s.set()`. The schema for the set's elements must be specified in the `validate.ofType` property.
 
 ```typescript
 import { s } from "s-validator";
 
-// A set where all items must be strings with a length of at least 3
-const tagsSchema = s.set(s.string({ validate: { minLength: 3 } }));
+// A set where all items must be strings with a length of at least 3.
+const tagsSchema = s.set({
+  validate: {
+    ofType: s.string({ validate: { minLength: 3 } }),
+  },
+});
 
 const tags = new Set(["typescript", "react", "css"]);
 await tagsSchema.parse(tags); // ✅
 
 const invalidTags = new Set(["ts", "react"]); // "ts" is too short
+await tagsSchema.parse(invalidTags); // ❌
+```
 
-try {
-  await tagsSchema.parse(invalidTags); // ❌
-} catch (e) {
-  console.log(e.issues);
-  /*
-  [
-    {
-      path: [ 0 ],
-      message: 'String must be at least 3 characters long'
-    }
-  ]
-  */
-}
+## Validation Rules
+
+The following validation rules can be added to the `validate` object in the configuration.
+
+### Size Validation
+
+- `minSize: number`: Checks if the set has at least a minimum number of elements.
+- `maxSize: number`: Checks if the set has at most a maximum number of elements.
+- `size: number`: Checks if the set has an exact number of elements.
+- `nonEmpty: true`: A shorthand for `minSize: 1`.
+
+**Example:**
+
+```typescript
+const schema = s.set({
+  validate: {
+    ofType: s.any(),
+    minSize: 2,
+    maxSize: 3,
+  },
+});
+
+await schema.parse(new Set([1, 2])); // ✅
+await schema.parse(new Set([1])); // ❌ (too few elements)
+await schema.parse(new Set([1, 2, 3, 4])); // ❌ (too many elements)
 ```
 
 ## Custom Messages

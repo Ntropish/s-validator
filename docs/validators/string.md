@@ -79,9 +79,7 @@ These validators check for common string formats. They are all enabled by passin
 | `ulid`      | A valid ULID.                      |
 | `emoji`     | A valid emoji.                     |
 | `ipv4`      | A valid IPv4 address.              |
-| `ipv4Cidr`  | A valid IPv4 CIDR block.           |
 | `ipv6`      | A valid IPv6 address.              |
-| `ipv6Cidr`  | A valid IPv6 CIDR block.           |
 | `base64`    | A valid base64 string.             |
 | `base64Url` | A valid base64url string.          |
 | `datetime`  | An ISO 8601 datetime string.       |
