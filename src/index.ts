@@ -22,6 +22,8 @@ import { UnionSchema, UnionValidatorConfig } from "./schemas/union.js";
 import { lazy } from "./utils.js";
 export { SwitchSchema, Schema };
 
+export * from "./types.js";
+
 type Builder = {
   [P in Exclude<
     (typeof plugins)[number],
