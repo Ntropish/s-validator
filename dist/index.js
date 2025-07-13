@@ -811,6 +811,16 @@ const recordPlugin = definePlugin({
   }
 });
 
+const setPlugin = definePlugin({
+  dataType: "set",
+  validate: {
+    identity: {
+      validator: (value) => value instanceof Set,
+      message: (ctx) => `Invalid type. Expected set, received ${typeof ctx.value}.`
+    }
+  }
+});
+
 const plugins = [
   anyPlugin,
   arrayPlugin,
@@ -827,7 +837,8 @@ const plugins = [
   recordPlugin,
   stringPlugin,
   unionPlugin,
-  unknownPlugin
+  unknownPlugin,
+  setPlugin
 ];
 const validatorMap = {};
 const preparationMap = {};
@@ -1542,13 +1553,13 @@ class SetSchema extends Schema {
     return preparedSet;
   }
   async _validate(value, context) {
+    await super._validate(value, context);
     if (this.config.optional && value === void 0) {
-      return /* @__PURE__ */ new Set();
+      return void 0;
     }
     if (this.config.nullable && value === null) {
       return null;
     }
-    await super._validate(value, context);
     if (!(value instanceof Set)) {
       return;
     }
@@ -1582,7 +1593,10 @@ class SetSchema extends Schema {
     return validatedSet;
   }
   async _transform(value, context) {
-    const transformedValue = await super._transform(value, context);
+    const transformedValue = await super._transform(
+      value,
+      context
+    );
     if (!(transformedValue instanceof Set)) {
       return transformedValue;
     }
@@ -1637,43 +1651,75 @@ class UnionSchema extends Schema {
   }
 }
 
+class LazySchema extends Schema {
+  constructor(resolver) {
+    super("lazy");
+    this.resolver = resolver;
+  }
+  schema;
+  resolveSchema() {
+    if (!this.schema) {
+      this.schema = this.resolver();
+    }
+    return this.schema;
+  }
+  async _prepare(context) {
+    return this.resolveSchema()._prepare(context);
+  }
+  async _validate(value, context) {
+    return this.resolveSchema()._validate(value, context);
+  }
+  async _transform(value, context) {
+    return this.resolveSchema()._transform(value, context);
+  }
+}
+function lazy(resolver) {
+  return new LazySchema(resolver);
+}
+
 function createSchemaBuilder() {
   const builder = {};
   for (const plugin of plugins) {
     if (plugin.dataType === "switch") continue;
     if (plugin.dataType === "array") {
-      builder.array = (itemSchemaOrConfig, config = {}) => {
-        if (itemSchemaOrConfig instanceof Schema) {
-          return new ArraySchema(itemSchemaOrConfig, config);
-        }
-        const configObj = itemSchemaOrConfig ?? {};
-        const itemSchema = configObj?.validate?.ofType ?? new Schema("any");
-        return new ArraySchema(itemSchema, configObj);
+      builder.array = (itemSchema, config = {}) => {
+        return new ArraySchema(itemSchema, config);
       };
       continue;
     }
     if (plugin.dataType === "object") {
-      builder.object = (config) => new ObjectSchema(config);
+      builder.object = (config = {}) => new ObjectSchema(config);
       continue;
     }
     if (plugin.dataType === "literal") {
-      builder.literal = (value) => {
-        return new Schema("literal", { validate: { equals: value } });
+      builder.literal = (value, config = {}) => {
+        return new Schema("literal", {
+          ...config,
+          validate: { ...config.validate, equals: value }
+        });
       };
       continue;
     }
     if (plugin.dataType === "record") {
-      builder.record = (keySchema, valueSchema) => {
+      builder.record = (keySchema, valueSchema, config = {}) => {
         return new Schema("record", {
-          validate: { keysAndValues: [keySchema, valueSchema] }
+          ...config,
+          validate: {
+            ...config.validate,
+            keysAndValues: [keySchema, valueSchema]
+          }
         });
       };
       continue;
     }
     if (plugin.dataType === "map") {
-      builder.map = (keySchema, valueSchema) => {
+      builder.map = (keySchema, valueSchema, config = {}) => {
         return new Schema("map", {
-          validate: { entries: [keySchema, valueSchema] }
+          ...config,
+          validate: {
+            ...config.validate,
+            entries: [keySchema, valueSchema]
+          }
         });
       };
       continue;
@@ -1686,29 +1732,30 @@ function createSchemaBuilder() {
       continue;
     }
     if (plugin.dataType === "instanceof") {
-      builder.instanceof = (constructor) => {
+      builder.instanceof = (constructor, config = {}) => {
         return new Schema("instanceof", {
-          validate: { constructor }
+          ...config,
+          validate: { ...config.validate, constructor }
         });
       };
       continue;
     }
     if (plugin.dataType === "union") {
-      builder.union = (config = {}) => {
-        const variants = config?.validate?.variants ?? [];
+      builder.union = (variants, config = {}) => {
         return new UnionSchema(variants, config);
       };
       continue;
     }
-    builder[plugin.dataType] = (config) => {
+    builder[plugin.dataType] = (config = {}) => {
       return new Schema(plugin.dataType, config);
     };
   }
   builder.switch = (config) => {
     return new SwitchSchema(config);
   };
+  builder.lazy = lazy;
   return builder;
 }
 const s = createSchemaBuilder();
 
-export { SwitchSchema, s };
+export { Schema, SwitchSchema, s };

@@ -18,13 +18,13 @@ describe("Advanced Type Validators", () => {
     it("should throw for an invalid key", async () => {
       const schema = s.map(s.string(), s.number());
       const map = new Map([[1, 1]]);
-      await expect((schema as any).parse(map)).rejects.toThrow(ValidationError);
+      await expect(schema.parse(map)).rejects.toThrow(ValidationError);
     });
 
     it("should throw for an invalid value", async () => {
       const schema = s.map(s.string(), s.number());
       const map = new Map([["a", "1"]]);
-      await expect((schema as any).parse(map)).rejects.toThrow(ValidationError);
+      await expect(schema.parse(map)).rejects.toThrow(ValidationError);
     });
   });
 

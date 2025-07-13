@@ -38,11 +38,7 @@ describe("s.infer", () => {
     const arrayData: ArrayType = ["a", "b"];
     expect(Array.isArray(arrayData)).toBe(true);
 
-    const unionSchema = s.union({
-      validate: {
-        variants: [s.string(), s.number()],
-      },
-    });
+    const unionSchema = s.union([s.string(), s.number()]);
     type UnionType = s.infer<typeof unionSchema>;
     const unionData1: UnionType = "string";
     const unionData2: UnionType = 123;

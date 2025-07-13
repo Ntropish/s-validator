@@ -9,11 +9,12 @@ import {
 
 export class UnionSchema<
   TVariants extends readonly [Schema<any, any>, ...Schema<any, any>[]],
-  TOutput = InferSchemaType<TVariants[number]>
-> extends Schema<TOutput> {
+  TOutput = InferSchemaType<TVariants[number]>,
+  TInput = TOutput
+> extends Schema<TOutput, TInput> {
   private variants: TVariants;
 
-  constructor(variants: TVariants, config: ValidatorConfig<any>) {
+  constructor(variants: TVariants, config: ValidatorConfig<TOutput>) {
     super("union", config);
     this.variants = variants;
   }

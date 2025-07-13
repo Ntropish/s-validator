@@ -8,8 +8,9 @@ import {
 
 export class SetSchema<
   TValue extends Schema<any, any>,
-  TOutput = Set<InferSchemaType<TValue>>
-> extends Schema<Set<InferSchemaType<TValue>>, TOutput> {
+  TOutput = Set<InferSchemaType<TValue>>,
+  TInput = TOutput
+> extends Schema<TOutput, TInput> {
   protected valueSchema: TValue;
 
   constructor(itemSchema: TValue, config: Record<string, unknown> = {}) {
@@ -89,11 +90,11 @@ export class SetSchema<
     return validatedSet;
   }
 
-  async _transform(
-    value: Set<any>,
-    context: ValidationContext
-  ): Promise<Set<InferSchemaType<TValue>>> {
-    const transformedValue = await super._transform(value, context);
+  async _transform(value: Set<any>, context: ValidationContext): Promise<any> {
+    const transformedValue: Set<any> = (await super._transform(
+      value,
+      context
+    )) as any;
 
     if (!(transformedValue instanceof Set)) {
       return transformedValue;

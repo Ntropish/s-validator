@@ -9,11 +9,12 @@ import {
 
 export class ArraySchema<
   T extends Schema<any, any>,
-  TOutput = InferSchemaType<T>[]
-> extends Schema<TOutput> {
+  TOutput = InferSchemaType<T>[],
+  TInput = TOutput
+> extends Schema<TOutput, TInput> {
   private itemSchema: T;
 
-  constructor(itemSchema: T, config: ValidatorConfig<any>) {
+  constructor(itemSchema: T, config: ValidatorConfig<TOutput>) {
     const newConfig = { ...config };
     if ((newConfig.validate as any)?.ofType) {
       delete (newConfig.validate as any).ofType;
