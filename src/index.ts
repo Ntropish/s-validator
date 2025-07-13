@@ -18,7 +18,7 @@ import { Schema } from "./schemas/schema.js";
 import { ArraySchema } from "./schemas/array.js";
 import { ObjectSchema } from "./schemas/object.js";
 import { SetSchema } from "./schemas/set.js";
-import { UnionSchema } from "./schemas/union.js";
+import { UnionSchema, UnionValidatorConfig } from "./schemas/union.js";
 import { lazy } from "./utils.js";
 export { SwitchSchema, Schema };
 
@@ -96,8 +96,7 @@ type Builder = {
     TOutput = InferSchemaType<T[number]>,
     TInput = InferSchemaType<T[number]>
   >(
-    variants: T,
-    config?: ValidatorConfig<TOutput>
+    config: UnionValidatorConfig<T, TOutput>
   ): UnionSchema<T, TOutput, TInput>;
   instanceof<T>(
     constructor: new (...args: any[]) => T,
@@ -189,11 +188,8 @@ function createSchemaBuilder(): Builder {
       continue;
     }
     if (plugin.dataType === "union") {
-      builder.union = (
-        variants: readonly Schema<any, any>[],
-        config: Record<string, unknown> = {}
-      ) => {
-        return new UnionSchema(variants as any, config);
+      builder.union = (config: Record<string, unknown> = {}) => {
+        return new UnionSchema(config as any);
       };
       continue;
     }

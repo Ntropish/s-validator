@@ -290,39 +290,65 @@ export class Schema<TOutput, TInput = TOutput>
     }
 
     for (const customValidator of this.customValidators) {
-      const result =
-        typeof customValidator === "function"
-          ? await customValidator(current_value, {
-              ...context,
-              value: current_value,
-            })
-          : await customValidator.validator(current_value, {
-              ...context,
-              value: current_value,
-            });
+      const customValidatorFn =
+        typeof customValidator === "object"
+          ? customValidator.validator
+          : customValidator;
+      const customMessage =
+        typeof customValidator === "object"
+          ? customValidator.message
+          : undefined;
+      const customValidatorName =
+        typeof customValidator === "object" ? customValidator.name : undefined;
 
-      if (!result) {
-        let message: string | undefined;
+      if (
+        !(await customValidatorFn(
+          current_value,
+          [],
+          { ...context, value: current_value },
+          this
+        ))
+      ) {
+        const messageProducerContext: MessageProducerContext = {
+          label: this.label,
+          value: current_value,
+          path: context.path,
+          dataType: this.dataType,
+          ctx: context.ctx,
+          args: [],
+          schema: this,
+        };
 
-        if (typeof customValidator === "object" && customValidator.message) {
-          if (typeof customValidator.message === "string") {
-            message = customValidator.message;
+        let message: string | undefined =
+          typeof customMessage === "function"
+            ? customMessage(messageProducerContext)
+            : customMessage;
+
+        if (!message) {
+          const userMessage =
+            messages[customValidatorName as keyof typeof messages] ??
+            messages["custom"];
+          if (typeof userMessage === "string") {
+            message = userMessage;
+          } else if (typeof userMessage === "function") {
+            message = (userMessage as MessageProducer)(messageProducerContext);
           } else {
-            message = (customValidator.message as MessageProducer)({
-              label: this.label,
-              value: current_value,
-              path: context.path,
-              dataType: this.dataType,
-              ctx: context.ctx,
-              args: [], // Custom validators don't have 'args' in the same way
-              schema: this,
-            });
+            const defaultMessageProducer = (messageMap as any)[this.dataType]?.[
+              "custom"
+            ];
+            if (defaultMessageProducer) {
+              message = defaultMessageProducer(messageProducerContext);
+            }
           }
         }
 
         issues.push({
           path: context.path,
-          message: message ?? `Custom validation failed for ${this.dataType}`,
+          message:
+            message ??
+            `Custom validation failed for ${
+              customValidatorName ?? this.dataType
+            }`,
         });
       }
     }

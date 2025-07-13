@@ -149,14 +149,22 @@ export type UndefinedToOptional<T> = Prettify<
   }
 >;
 
-export type CustomValidator<T> =
-  | ((value: T, context: ValidationContext) => boolean | Promise<boolean>)
+export type CustomValidator<TOutput> =
+  | ((
+      value: TOutput,
+      args: any[],
+      context: ValidationContext,
+      schema: any
+    ) => any)
   | {
       validator: (
-        value: T,
-        context: ValidationContext
-      ) => boolean | Promise<boolean>;
-      message?: string;
+        value: TOutput,
+        args: any[],
+        context: ValidationContext,
+        schema: any
+      ) => any;
+      message?: string | MessageProducer;
+      name?: string;
     };
 
 // Creates a typed config object from a validator collection.

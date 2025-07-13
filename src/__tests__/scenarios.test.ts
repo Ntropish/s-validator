@@ -179,11 +179,15 @@ describe("20 Scenarios", () => {
       validate: {
         properties: {
           fullName: s.string(),
-          ticketType: s.union([
-            s.literal("general"),
-            s.literal("vip"),
-            s.literal("student"),
-          ]),
+          ticketType: s.union({
+            validate: {
+              of: [
+                s.literal("general"),
+                s.literal("vip"),
+                s.literal("student"),
+              ],
+            },
+          }),
           addOns: s.array(s.string()).optional(),
           paymentDetails: s.switch({
             select: (ctx) => ctx.value.method,
@@ -704,11 +708,11 @@ describe("20 Scenarios", () => {
       validate: {
         properties: {
           name: s.string(),
-          class: s.union([
-            s.literal("warrior"),
-            s.literal("mage"),
-            s.literal("rogue"),
-          ]),
+          class: s.union({
+            validate: {
+              of: [s.literal("warrior"), s.literal("mage"), s.literal("rogue")],
+            },
+          }),
           level: s.number({ validate: { integer: true, gte: 1 } }),
           attributes: s.object({
             validate: {
@@ -868,7 +872,9 @@ describe("20 Scenarios", () => {
       },
     });
 
-    const feedItemSchema = s.union([postSchema, sharedPostSchema]);
+    const feedItemSchema = s.union({
+      validate: { of: [postSchema, sharedPostSchema] },
+    });
 
     const validPost = {
       type: "post",
@@ -1106,5 +1112,63 @@ describe("20 Scenarios", () => {
     };
     const result = await fileSystemEntrySchema.safeParse(invalidTree2);
     expect(result.status).toBe("error");
+  });
+
+  it("Scenario 21: Survey Responses", async () => {
+    const surveyResponseSchema = s.object({
+      validate: {
+        properties: {
+          surveyId: s.string(),
+          responses: s.array(
+            s.object({
+              validate: {
+                properties: {
+                  questionId: s.string(),
+                  answer: s.union({
+                    validate: {
+                      of: [
+                        s.string(),
+                        s.number(),
+                        s.array(s.string()),
+                        s.object({
+                          validate: {
+                            properties: {
+                              lat: s.number(),
+                              long: s.number(),
+                            },
+                          },
+                        }),
+                      ],
+                    },
+                  }),
+                },
+              },
+            })
+          ),
+        },
+      },
+    });
+
+    const validSurveyResponse = {
+      surveyId: "survey123",
+      responses: [
+        { questionId: "q1", answer: "Answer 1" },
+        { questionId: "q2", answer: 42 },
+        { questionId: "q3", answer: ["Option 1", "Option 2"] },
+        { questionId: "q4", answer: { lat: 40.7128, long: -74.006 } },
+      ],
+    };
+
+    await expect(
+      surveyResponseSchema.parse(validSurveyResponse)
+    ).resolves.toEqual(validSurveyResponse);
+
+    const invalidSurveyResponse = {
+      ...validSurveyResponse,
+      responses: [{ questionId: "q1", answer: { invalid: "answer" } }],
+    };
+    await expect(
+      surveyResponseSchema.safeParse(invalidSurveyResponse)
+    ).resolves.toEqual(expect.objectContaining({ status: "error" }));
   });
 });
