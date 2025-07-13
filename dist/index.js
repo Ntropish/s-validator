@@ -1,3 +1,6 @@
+function x(e) {
+  return e;
+}
 class p extends Error {
   issues;
   constructor(t) {
@@ -1401,9 +1404,11 @@ function X() {
     }
   return e.switch = (t) => new H(t), e.lazy = Q, e;
 }
-const x = X();
+const ee = X();
 export {
   h as Schema,
   H as SwitchSchema,
-  x as s
+  p as ValidationError,
+  x as definePlugin,
+  ee as s
 };

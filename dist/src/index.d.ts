@@ -7,6 +7,7 @@ import { ObjectSchema } from './schemas/object.js';
 import { SetSchema } from './schemas/set.js';
 import { UnionSchema, UnionValidatorConfig } from './schemas/union.js';
 export { SwitchSchema, Schema };
+export * from './types.js';
 type Builder = {
     [P in Exclude<(typeof plugins)[number], {
         dataType: "switch" | "object" | "literal" | "array" | "record" | "map" | "set" | "union" | "instanceof";
