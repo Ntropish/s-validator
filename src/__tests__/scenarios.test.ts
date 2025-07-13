@@ -1114,6 +1114,81 @@ describe("20 Scenarios", () => {
     expect(result.status).toBe("error");
   });
 
+  it("Scenario 20b: Recursive File System Tree with s.lazy()", async () => {
+    type File = {
+      type: "file";
+      name: string;
+      size: number;
+    };
+
+    type Directory = {
+      type: "directory";
+      name: string;
+      children: FileSystemEntry[];
+    };
+
+    type FileSystemEntry = File | Directory;
+
+    const fileSchema = s.object({
+      validate: {
+        properties: {
+          type: s.literal("file"),
+          name: s.string(),
+          size: s.number(),
+        },
+      },
+    });
+
+    const directorySchema: Schema<Directory> = s.object({
+      validate: {
+        properties: {
+          type: s.literal("directory"),
+          name: s.string(),
+          children: s.array(s.lazy(() => entrySchema)),
+        },
+      },
+    });
+
+    const entrySchema: Schema<FileSystemEntry> = s.switch({
+      select: (v) => v.value.type,
+      cases: {
+        file: fileSchema,
+        directory: directorySchema,
+      },
+    });
+
+    // Example of a valid tree
+    const fileSystemTree: FileSystemEntry = {
+      type: "directory",
+      name: "root",
+      children: [
+        { type: "file", name: "file1.txt", size: 100 },
+        {
+          type: "directory",
+          name: "subdir",
+          children: [{ type: "file", name: "file2.txt", size: 200 }],
+        },
+      ],
+    };
+
+    const result = await entrySchema.safeParse(fileSystemTree);
+    expect(result.status).toBe("success");
+    if (result.status === "success") {
+      expect(result.data).toEqual(fileSystemTree);
+    }
+
+    // Example of an invalid tree
+    const invalidTree: FileSystemEntry = {
+      type: "directory",
+      name: "root",
+      children: [{ type: "file", name: "file1.txt", size: "100kb" as any }], // invalid size
+    };
+
+    await expect(entrySchema.safeParse(invalidTree)).resolves.toEqual(
+      expect.objectContaining({ status: "error" })
+    );
+  });
+
   it("Scenario 21: Survey Responses", async () => {
     const surveyResponseSchema = s.object({
       validate: {

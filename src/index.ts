@@ -19,7 +19,7 @@ import { ArraySchema } from "./schemas/array.js";
 import { ObjectSchema } from "./schemas/object.js";
 import { SetSchema } from "./schemas/set.js";
 import { UnionSchema, UnionValidatorConfig } from "./schemas/union.js";
-import { lazy } from "./utils.js";
+import { lazy } from "./validators/lazy.js";
 export { SwitchSchema, Schema };
 
 export * from "./types.js";
