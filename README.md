@@ -37,7 +37,7 @@ In a sea of validation libraries, `s-validator` stands out by focusing on a few 
 
 ```mermaid
 graph TD
-    A[Input Data] --> P["<b>1. Preparation</b><br>Coerce types (string to Date)<br>Trim strings<br>Apply defaults"];
+    A[Input Data] --> P["<b>1. Preparation</b><br>Coerce types<br>Trim strings<br>Apply defaults"];
     P --> V["<b>2. Validation</b><br>Check lengths/ranges<br>Validate formats (email, URL)<br>Run custom rules"];
     V --> T["<b>3. Transformation</b><br>Change data shape<br>Format values<br>Add or remove fields"];
     T --> O[Output Data];
