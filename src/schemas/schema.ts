@@ -135,7 +135,7 @@ export class Schema<TOutput, TInput = TOutput>
 
     this["~standard"] = {
       version: 1,
-      vendor: "s-val",
+      vendor: "s-validator",
       validate: async (
         value: unknown
       ): Promise<StandardSchemaV1.Result<TOutput>> => {

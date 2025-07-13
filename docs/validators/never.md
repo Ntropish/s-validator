@@ -7,7 +7,7 @@ The `never` validator rejects every value passed to it. This is useful for ensur
 `s.never()` will always fail validation for any value provided.
 
 ```typescript
-import { s } from "s-val";
+import { s } from "s-validator";
 
 const schema = s.never();
 

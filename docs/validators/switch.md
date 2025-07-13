@@ -7,7 +7,7 @@ The `s.switch()` validator provides a way to dynamically choose which schema to 
 `s.switch()` takes a single configuration object with the following properties:
 
 - `select`: A function that receives the `ValidationContext` and returns a `string` or `number`. This key is used to look up the appropriate schema from the `cases` map.
-- `cases`: An object (or map) where keys are the values that can be returned by `select`, and values are the corresponding `s-val` schemas to use for validation.
+- `cases`: An object (or map) where keys are the values that can be returned by `select`, and values are the corresponding `s-validator` schemas to use for validation.
 - `default` (optional): A schema to use if the key returned by `select` does not exist in the `cases` map.
 - `failOnNoMatch` (optional): A boolean. If `true`, the validation will fail if no case is matched and no `default` schema is provided. If `false` (the default), the original value is passed through unmodified in that scenario.
 
@@ -16,7 +16,7 @@ The `s.switch()` validator provides a way to dynamically choose which schema to 
 Here is an example of validating different event types. The `type` property determines which schema is used for the rest of the object.
 
 ```typescript
-import { s } from "s-val";
+import { s } from "s-validator";
 
 const eventSchema = s.switch({
   // 1. The select function
@@ -104,7 +104,7 @@ The `s.switch` validator can be configured with top-level preparations, transfor
 This example demonstrates how you can use top-level modifiers to preprocess data, add extra validation, and post-process the final result.
 
 ```typescript
-import { s } from "s-val";
+import { s } from "s-validator";
 
 const customMessage = "Input value must be greater than 0";
 

@@ -11,7 +11,7 @@ You create a union schema by passing a configuration object to `s.union()`. The 
 You can use `s.union()` to allow a value to be one of several primitive types.
 
 ```typescript
-import { s } from "s-val";
+import { s } from "s-validator";
 
 const stringOrNumberSchema = s.union({
   validate: {
@@ -34,7 +34,7 @@ try {
 `s.union()` is also powerful for validating inputs that could be one of several different object shapes. The validator will try each schema in order until one passes.
 
 ```typescript
-import { s } from "s-val";
+import { s } from "s-validator";
 
 const contactSchema = s.union({
   validate: {

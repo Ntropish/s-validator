@@ -7,7 +7,7 @@ The `literal` validator checks if a value is strictly equal (`===`) to a specifi
 You pass the literal value directly to the `s.literal()` method.
 
 ```typescript
-import { s } from "s-val";
+import { s } from "s-validator";
 
 // Check for a specific string
 const statusSchema = s.literal("success");
@@ -31,7 +31,7 @@ await trueSchema.parse(true); // ✅
 This is especially useful for creating discriminated unions with `s.switch()`.
 
 ```typescript
-import { s } from "s-val";
+import { s } from "s-validator";
 
 const eventSchema = s.switch({
   select: (ctx) => ctx.value.type,

@@ -7,7 +7,7 @@ The `instanceof` validator checks if a value is an instance of a given class usi
 You pass the class constructor directly to the `s.instanceof()` method.
 
 ```typescript
-import { s } from "s-val";
+import { s } from "s-validator";
 
 class TestClass {}
 class AnotherClass {}

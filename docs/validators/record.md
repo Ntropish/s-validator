@@ -9,10 +9,10 @@ It is similar to `s.map()`, but it works with plain JavaScript objects instead o
 You create a record schema by passing the key schema and the value schema as arguments to the `s.record()` method.
 
 1.  The first argument is the schema for the keys. This must be a schema that validates to a `string` or `number`.
-2.  The second argument is the schema for the values. This can be any `s-val` schema.
+2.  The second argument is the schema for the values. This can be any `s-validator` schema.
 
 ```typescript
-import { s } from "s-val";
+import { s } from "s-validator";
 
 // A record where keys are strings and values are numbers.
 const scoresSchema = s.record(s.string(), s.number());
@@ -56,7 +56,7 @@ try {
 }
 ```
 
-> **Note:** JavaScript object keys are implicitly converted to strings. If you use `s.number()` as the key schema, `s-val` will correctly validate the stringified number.
+> **Note:** JavaScript object keys are implicitly converted to strings. If you use `s.number()` as the key schema, `s-validator` will correctly validate the stringified number.
 
 ## Value Validation
 

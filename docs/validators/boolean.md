@@ -5,7 +5,7 @@ The `boolean` validator checks if a value is a boolean (`true` or `false`).
 ## Usage
 
 ```typescript
-import { s } from "s-val";
+import { s } from "s-validator";
 
 const schema = s.boolean();
 

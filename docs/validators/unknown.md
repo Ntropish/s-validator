@@ -5,7 +5,7 @@ The `unknown` validator accepts any value. It is similar to `s.any()`, but it pr
 ## Usage
 
 ```typescript
-import { s } from "s-val";
+import { s } from "s-validator";
 
 const schema = s.unknown();
 

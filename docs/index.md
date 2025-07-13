@@ -1,10 +1,10 @@
-# s-val: Simple, Type-Safe Validation
+# s-validator: Simple, Type-Safe Validation
 
-Welcome to the official documentation for `s-val`, a lightweight, zero-dependency, and type-safe validation library for TypeScript and JavaScript.
+Welcome to the official documentation for `s-validator`, a lightweight, zero-dependency, and type-safe validation library for TypeScript and JavaScript.
 
 ## Core Concepts: The Three-Phase Pipeline
 
-`s-val` operates on a unique **three-phase validation pipeline** for every schema. This ensures a predictable and powerful validation process. When you call `parse()` or `safeParse()`, the data goes through these steps in order for the entire schema tree:
+`s-validator` operates on a unique **three-phase validation pipeline** for every schema. This ensures a predictable and powerful validation process. When you call `parse()` or `safeParse()`, the data goes through these steps in order for the entire schema tree:
 
 1.  **Preparation (`prepare`)**: The raw input is recursively traversed, and preparation functions are run. This is the ideal place to **coerce** data into the correct type _before_ validation, such as converting a date string to a `Date` object or trimming whitespace from a string.
 
@@ -21,7 +21,7 @@ Once you have a schema, you can validate your data using one of two methods: `pa
 The `parse` method is best used when you expect validation to succeed but want an error thrown if it doesn't. It returns the fully prepared, validated, and transformed data. If validation fails at any point, it throws a `ValidationError`.
 
 ```typescript
-import { s } from "s-val";
+import { s } from "s-validator";
 
 const schema = s.string({
   prepare: { trim: true },
@@ -83,7 +83,7 @@ if (result.status === "error") {
 For more advanced use cases, you can provide a function to the `messages` object. This function will receive a context object containing the `value` being validated, the `label` for the schema, the validation `args`, and more. This allows you to create dynamic error messages.
 
 ```typescript
-import { s } from "s-val";
+import { s } from "s-validator";
 
 const ageSchema = s.number({
   label: "User age",
@@ -160,12 +160,12 @@ You can create complex data structures by nesting schemas.
 
 ## Type Inference with `s.infer`
 
-`s-val` can automatically infer a static TypeScript type from your schema. This is extremely useful for ensuring that your code remains type-safe after validation, without needing to manually define the types yourself.
+`s-validator` can automatically infer a static TypeScript type from your schema. This is extremely useful for ensuring that your code remains type-safe after validation, without needing to manually define the types yourself.
 
 To infer the type, use the `s.infer<T>` utility, where `T` is the `typeof` your schema.
 
 ```typescript
-import { s } from "s-val";
+import { s } from "s-validator";
 
 const userSchema = s.object({
   validate: {
@@ -216,13 +216,12 @@ Now that you have the basics, you can dive deeper into the specific validators o
 
 ### Interoperability with `StandardSchemaV1`
 
-`s-val` schemas are compatible with the [`StandardSchemaV1` interface](https://github.com/alexreardon/standard-schemas). This allows you to use `s-val` schemas with other libraries and tools that adhere to the same standard.
+`s-validator` schemas are compatible with the [`StandardSchemaV1` interface](https://github.com/alexreardon/standard-schemas). This allows you to use `s-validator` schemas with other libraries and tools that adhere to the same standard.
 
 The compatibility interface is available under the `~standard` property on any schema instance.
 
 ```typescript
-import { s } from "s-val";
-import type { StandardSchemaV1 } from "s-val/dist/standard-schema";
+import { s } from "s-validator";
 
 const userSchema = s.object({
   validate: {
@@ -231,7 +230,7 @@ const userSchema = s.object({
 });
 
 // Access the standard interface
-const standardUserSchema: StandardSchemaV1<any, any> = userSchema["~standard"];
+const standardUserSchema = userSchema["~standard"];
 
 // You can now use this with any tool that expects a StandardSchemaV1
 const result = await standardUserSchema.validate({ name: "John" });

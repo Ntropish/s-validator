@@ -1,10 +1,10 @@
 # Validator Reference
 
-This section provides a detailed API reference for all of the built-in validators available in `s-val`.
+This section provides a detailed API reference for all of the built-in validators available in `s-validator`.
 
 ## Core Concepts
 
-In `s-val`, a "validator" is a schema that defines a set of rules for a specific data type. All validators are functions available on the main `s` object (e.g., `s.string()`, `s.number()`).
+In `s-validator`, a "validator" is a schema that defines a set of rules for a specific data type. All validators are functions available on the main `s` object (e.g., `s.string()`, `s.number()`).
 
 ### Schema Configuration
 

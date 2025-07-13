@@ -7,7 +7,7 @@ describe("Standard Schema", () => {
     const schema = s.string();
     expect(schema).toHaveProperty("~standard");
     expect(schema["~standard"].version).toBe(1);
-    expect(schema["~standard"].vendor).toBe("s-val");
+    expect(schema["~standard"].vendor).toBe("s-validator");
   });
 
   it("should validate successfully via the standard interface", async () => {

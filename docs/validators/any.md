@@ -7,7 +7,7 @@ The `any` validator is a pass-through that allows any value. It's useful as a pl
 ## Usage
 
 ```typescript
-import { s } from "s-val";
+import { s } from "s-validator";
 
 const schema = s.any();
 

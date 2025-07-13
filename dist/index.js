@@ -959,7 +959,7 @@ class Schema {
     }
     this["~standard"] = {
       version: 1,
-      vendor: "s-val",
+      vendor: "s-validator",
       validate: async (value) => {
         const result = await this.safeParse(value);
         if (result.status === "success") {

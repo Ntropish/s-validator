@@ -12,7 +12,7 @@ A common use case is receiving numeric data as strings (e.g., from query paramet
 - **Default**: `false`
 
 ```typescript
-import { s } from "s-val";
+import { s } from "s-validator";
 
 const schema = s.number({
   prepare: {

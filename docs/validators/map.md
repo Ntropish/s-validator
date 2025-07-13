@@ -7,7 +7,7 @@ The `map` validator checks if a value is a `Map` and validates its keys and valu
 You pass the key schema and value schema as arguments to the `s.map()` method.
 
 ```typescript
-import { s } from "s-val";
+import { s } from "s-validator";
 
 const schema = s.map(s.string(), s.number());
 

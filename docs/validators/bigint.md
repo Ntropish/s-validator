@@ -5,7 +5,7 @@ The `bigint` validator checks if a value is a `bigint`.
 ## Usage
 
 ```typescript
-import { s } from "s-val";
+import { s } from "s-validator";
 
 const schema = s.bigint();
 

@@ -10,7 +10,7 @@ You create an array schema by passing the item schema as the first argument to `
 - **Config Object**: An object for validation rules like `minLength`, `maxLength`, etc.
 
 ```typescript
-import { s } from "s-val";
+import { s } from "s-validator";
 
 // An array where all items must be strings.
 const stringArraySchema = s.array(s.string());

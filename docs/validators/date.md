@@ -12,7 +12,7 @@ The most common use case for the date validator is to accept date strings or num
 - **Default**: `false`
 
 ```typescript
-import { s } from "s-val";
+import { s } from "s-validator";
 
 const eventSchema = s.date({
   prepare: { coerce: true }, // "2023-01-01" -> new Date("2023-01-01")

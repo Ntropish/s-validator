@@ -5,7 +5,7 @@ The `s.string()` validator checks if a value is a string. It also provides a wid
 ## Basic Usage
 
 ```typescript
-import { s } from "s-val";
+import { s } from "s-validator";
 
 const schema = s.string();
 

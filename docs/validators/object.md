@@ -7,7 +7,7 @@ The `object` validator checks if a value is a non-null, non-array object and val
 You define the shape of an object by passing a configuration object to `s.object()`. The `properties` key must be nested inside a `validate` object.
 
 ```typescript
-import { s } from "s-val";
+import { s } from "s-validator";
 
 const userSchema = s.object({
   validate: {
@@ -44,7 +44,7 @@ The following options are available in the `validate` object:
 
 ### `properties`
 
-An object where keys are property names and values are `s-val` schemas. This defines the shape of the object.
+An object where keys are property names and values are `s-validator` schemas. This defines the shape of the object.
 
 ### `strict`
 
@@ -181,7 +181,7 @@ When the schema is being defined, the getter for the recursive property is not c
 Here is an example of a recursive schema for a file system entry, which can be a file or a directory containing other entries.
 
 ```typescript
-import { s, Schema } from "s-val";
+import { s, Schema } from "s-validator";
 
 type File = {
   type: "file";

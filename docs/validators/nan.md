@@ -5,7 +5,7 @@ The `nan` validator checks if a value is `NaN` (Not-a-Number).
 ## Usage
 
 ```typescript
-import { s } from "s-val";
+import { s } from "s-validator";
 
 const schema = s.nan();
 

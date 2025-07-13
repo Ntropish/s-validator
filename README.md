@@ -1,8 +1,8 @@
-# s-val
+# s-validator
 
 **A simple, lightweight, and type-safe validation library for TypeScript and JavaScript.**
 
-`s-val` provides a straightforward and declarative API for building validation schemas, ensuring your data conforms to the required structure and types without any external dependencies.
+`s-validator` provides a straightforward and declarative API for building validation schemas, ensuring your data conforms to the required structure and types without any external dependencies.
 
 ![cover image](./cover.webp)
 
@@ -17,7 +17,7 @@
 
 ## Core Concepts
 
-`s-val` operates on a unique **three-phase validation pipeline** for every schema, ensuring a predictable and powerful validation process. When you call `parse()` or `safeParse()`, the data goes through these steps in order:
+`s-validator` operates on a unique **three-phase validation pipeline** for every schema, ensuring a predictable and powerful validation process. When you call `parse()` or `safeParse()`, the data goes through these steps in order:
 
 1.  **Preparation (`_prepare`)**: The raw input is recursively traversed, and preparation functions are run. This is ideal for coercing data into the correct type _before_ validation, such as converting a date string to a `Date` object or trimming a string.
 
@@ -27,20 +27,20 @@
 
 ## Getting Started
 
-First, install `s-val` in your project:
+First, install `s-validator` in your project:
 
 ```bash
-npm install s-val
+npm install s-validator
 # or
-yarn add s-val
+yarn add s-validator
 # or
-pnpm add s-val
+pnpm add s-validator
 ```
 
 Next, define a schema and use it to validate your data.
 
 ```typescript
-import { s } from "s-val";
+import { s } from "s-validator";
 
 // 1. Define a schema with preparations and transformations
 const userSchema = s.object({
