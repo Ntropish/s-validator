@@ -11,7 +11,7 @@ describe("Union Validator", () => {
 
   it("should throw if the value does not match any of the schemas", async () => {
     const schema = s.union([s.string(), s.number()]);
-    await expect(schema.parse(true as any)).rejects.toThrow(ValidationError);
+    await expect(schema.parse(true)).rejects.toThrow(ValidationError);
   });
 
   it("should pass with more complex schemas", async () => {
