@@ -17,7 +17,7 @@ import { unionPlugin } from "./validators/union.js";
 import { recordPlugin } from "./validators/record.js";
 import { setPlugin } from "./validators/set.js";
 
-export const plugins: Validator<any, any>[] = [
+export const basePlugins: Validator<any, any>[] = [
   anyPlugin,
   arrayPlugin,
   bigintPlugin,
@@ -37,35 +37,35 @@ export const plugins: Validator<any, any>[] = [
   setPlugin,
 ];
 
-export const validatorMap: SchemaValidatorMap = {};
-export const preparationMap: Record<string, any> = {};
-export const transformationMap: Record<string, any> = {};
-export const messageMap: Record<string, any> = {};
+export const baseValidatorMap: SchemaValidatorMap = {};
+export const basePreparationMap: Record<string, any> = {};
+export const baseTransformationMap: Record<string, any> = {};
+export const baseMessageMap: Record<string, any> = {};
 
-for (const plugin of plugins) {
+for (const plugin of basePlugins) {
   const dataType = plugin.dataType;
-  validatorMap[dataType] = validatorMap[dataType] || {
+  baseValidatorMap[dataType] = baseValidatorMap[dataType] || {
     identity: (value: any) => false,
   };
-  preparationMap[dataType] = preparationMap[dataType] || {};
-  transformationMap[dataType] = transformationMap[dataType] || {};
-  messageMap[dataType] = messageMap[dataType] || {};
+  basePreparationMap[dataType] = basePreparationMap[dataType] || {};
+  baseTransformationMap[dataType] = baseTransformationMap[dataType] || {};
+  baseMessageMap[dataType] = baseMessageMap[dataType] || {};
 
   if (plugin.prepare) {
     for (const name in plugin.prepare) {
-      preparationMap[dataType][name] = plugin.prepare[name];
+      basePreparationMap[dataType][name] = plugin.prepare[name];
     }
   }
   if (plugin.validate) {
     for (const name in plugin.validate) {
       const validatorDef = plugin.validate[name]!;
-      validatorMap[dataType][name] = validatorDef.validator;
-      messageMap[dataType][name] = validatorDef.message;
+      baseValidatorMap[dataType][name] = validatorDef.validator;
+      baseMessageMap[dataType][name] = validatorDef.message;
     }
   }
   if (plugin.transform) {
     for (const name in plugin.transform) {
-      transformationMap[dataType][name] = plugin.transform[name];
+      baseTransformationMap[dataType][name] = plugin.transform[name];
     }
   }
 }

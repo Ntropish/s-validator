@@ -3,6 +3,8 @@ import {
   type CustomValidator,
   type ValidatorConfig,
   type ValidationContext,
+  createSValidator,
+  type Plugin,
 } from "../index";
 import { describe, it, expect } from "vitest";
 
@@ -147,5 +149,68 @@ describe("extensibility", () => {
         expect(result.error.issues[0].message).toBe("Custom max size error");
       }
     });
+  });
+});
+
+describe("plugin system", () => {
+  // 1. Define a plugin
+  const stringPlusPlugin: Plugin<string> = {
+    dataType: "string",
+    validate: {
+      isEmail: {
+        validator: (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),
+        message: () => "Must be a valid email address",
+      },
+      isUrl: {
+        validator: (value: string) => {
+          try {
+            new URL(value);
+            return true;
+          } catch {
+            return false;
+          }
+        },
+        message: () => "Must be a valid URL",
+      },
+    },
+  };
+
+  // 2. Create an s-validator instance with the plugin
+  const sWithPlugin = createSValidator([stringPlusPlugin]);
+
+  // 3. Create a standard s-validator instance (for comparison)
+  const sWithoutPlugin = createSValidator();
+
+  it("should successfully validate with a custom plugin validator", async () => {
+    const emailSchema = sWithPlugin.string({ validate: { isEmail: true } });
+    await expect(emailSchema.parse("test@example.com")).resolves.toBe(
+      "test@example.com"
+    );
+
+    const urlSchema = sWithPlugin.string({ validate: { isUrl: true } });
+    await expect(urlSchema.parse("https://example.com")).resolves.toBe(
+      "https://example.com"
+    );
+  });
+
+  it("should fail validation for invalid input with a custom plugin validator", async () => {
+    const emailSchema = sWithPlugin.string({ validate: { isEmail: true } });
+    const result = await emailSchema.safeParse("not-an-email");
+    expect(result.status).toBe("error");
+    if (result.status === "error") {
+      expect(result.error.issues[0].message).toBe(
+        "Must be a valid email address"
+      );
+    }
+  });
+
+  it("should not recognize the plugin validator in an instance created without the plugin", async () => {
+    const emailSchema = sWithoutPlugin.string({
+      validate: { isEmail: true },
+    });
+    // This should pass validation because the unknown `isEmail` rule is ignored.
+    await expect(emailSchema.parse("not-an-email")).resolves.toBe(
+      "not-an-email"
+    );
   });
 });

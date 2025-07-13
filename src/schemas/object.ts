@@ -9,14 +9,30 @@ import {
   MessageProducer,
 } from "../types.js";
 
+type Maps = {
+  validatorMap: any;
+  preparationMap: any;
+  transformationMap: any;
+  messageMap: any;
+};
+
 export class ObjectSchema<
   P extends SObjectProperties,
   T = InferSObjectType<P>
 > extends Schema<T> {
-  constructor(
-    config: ValidatorConfig<any> & { validate?: { properties?: P } }
-  ) {
-    super("object", config);
+  private properties: P;
+
+  constructor(config: Record<string, unknown> = {}, maps?: Maps) {
+    const properties = (config?.validate as any)?.properties ?? {};
+    super("object", config, maps);
+    this.properties = properties;
+    if (this.maps) {
+      for (const key in this.properties) {
+        if (Object.prototype.hasOwnProperty.call(this.properties, key)) {
+          this.properties[key].maps = this.maps;
+        }
+      }
+    }
   }
 
   public async _prepare(context: ValidationContext): Promise<any> {
@@ -235,7 +251,7 @@ export class ObjectSchema<
         properties: newProperties as P,
       },
     };
-    return new ObjectSchema(newConfig as any);
+    return new ObjectSchema(newConfig as any, this.maps);
   }
 
   public pick<K extends keyof P & keyof T>(
@@ -256,7 +272,7 @@ export class ObjectSchema<
       },
       strict: true,
     };
-    return new ObjectSchema(newConfig as any);
+    return new ObjectSchema(newConfig as any, this.maps);
   }
 
   public omit<K extends keyof P>(
@@ -275,7 +291,7 @@ export class ObjectSchema<
       },
       strict: true,
     };
-    return new ObjectSchema(newConfig as any);
+    return new ObjectSchema(newConfig as any, this.maps);
   }
 
   public extend<E extends SObjectProperties>(
@@ -290,6 +306,6 @@ export class ObjectSchema<
         properties: newProperties,
       },
     };
-    return new ObjectSchema(newConfig as any);
+    return new ObjectSchema(newConfig as any, this.maps);
   }
 }

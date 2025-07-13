@@ -202,3 +202,10 @@ export type InferSObjectType<P extends SObjectProperties> = Prettify<
     [K in keyof P]: InferSchemaType<P[K]>;
   }>
 >;
+
+export type Plugin<TOutput, TInput = TOutput> = {
+  dataType: string;
+  prepare?: PreparationCollection;
+  validate?: Partial<ValidatorCollection<TOutput>>;
+  transform?: TransformationCollection;
+};

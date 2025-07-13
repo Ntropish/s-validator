@@ -7,6 +7,13 @@ import {
   ValidationError,
 } from "../types.js";
 
+type Maps = {
+  validatorMap: any;
+  preparationMap: any;
+  transformationMap: any;
+  messageMap: any;
+};
+
 export class ArraySchema<
   T extends Schema<any, any>,
   TOutput = InferSchemaType<T>[],
@@ -14,14 +21,16 @@ export class ArraySchema<
 > extends Schema<TOutput, TInput> {
   private itemSchema: T;
 
-  constructor(itemSchema: T, config: ValidatorConfig<TOutput>) {
-    const newConfig = { ...config };
-    if ((newConfig.validate as any)?.ofType) {
-      delete (newConfig.validate as any).ofType;
-    }
-
-    super("array", newConfig);
+  constructor(
+    itemSchema: T,
+    config: Record<string, unknown> = {},
+    maps?: Maps
+  ) {
+    super("array", config, maps);
     this.itemSchema = itemSchema;
+    if (this.maps) {
+      this.itemSchema.maps = this.maps;
+    }
   }
 
   public async _prepare(context: ValidationContext): Promise<any> {

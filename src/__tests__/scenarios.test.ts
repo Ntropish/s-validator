@@ -1059,19 +1059,17 @@ describe("20 Scenarios", () => {
       },
     });
 
-    const directorySchema = s.object({
+    const directorySchema: Schema<Directory> = s.object({
       validate: {
         properties: {
           type: s.literal("directory"),
           name: s.string(),
-          get children() {
-            return s.array(fileSystemEntrySchema);
-          },
+          children: s.array(s.lazy(() => fileSystemEntrySchema)),
         },
       },
     });
 
-    const fileSystemEntrySchema = s.switch({
+    const fileSystemEntrySchema: Schema<FileSystemEntry> = s.switch({
       select: (ctx) => ctx.value.type,
       cases: {
         file: fileSchema,
@@ -1080,7 +1078,7 @@ describe("20 Scenarios", () => {
       failOnNoMatch: true,
     });
 
-    const validTree: Directory = {
+    const validTree: FileSystemEntry = {
       type: "directory",
       name: "root",
       children: [
@@ -1097,8 +1095,9 @@ describe("20 Scenarios", () => {
       validTree
     );
 
-    const invalidTree = {
-      ...validTree,
+    const invalidTree: FileSystemEntry = {
+      type: "directory",
+      name: "root",
       children: [{ type: "file", name: "invalid", size: -10 }],
     };
     await expect(fileSystemEntrySchema.safeParse(invalidTree)).resolves.toEqual(
@@ -1110,7 +1109,7 @@ describe("20 Scenarios", () => {
       name: "root",
       children: [{ type: "other", name: "invalid" }],
     };
-    const result = await fileSystemEntrySchema.safeParse(invalidTree2);
+    const result = await fileSystemEntrySchema.safeParse(invalidTree2 as any);
     expect(result.status).toBe("error");
   });
 

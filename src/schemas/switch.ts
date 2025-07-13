@@ -1,5 +1,5 @@
 import { ValidationContext, ValidationError, ValidatorConfig } from "../types";
-import { Schema } from "./schema.js";
+import { Schema, Maps } from "./schema.js";
 
 export type SwitchConfig = ValidatorConfig<any> & {
   select: (context: ValidationContext) => any;
@@ -9,8 +9,22 @@ export type SwitchConfig = ValidatorConfig<any> & {
 };
 
 export class SwitchSchema extends Schema<any> {
-  constructor(config: SwitchConfig) {
-    super("switch", config);
+  constructor(config: SwitchConfig, maps?: Maps) {
+    super("switch", config, maps);
+
+    if (this.maps) {
+      const { cases, default: defaultSchema } = this.config as SwitchConfig;
+      if (cases) {
+        for (const key in cases) {
+          if (Object.prototype.hasOwnProperty.call(cases, key)) {
+            cases[key].maps = this.maps;
+          }
+        }
+      }
+      if (defaultSchema) {
+        defaultSchema.maps = this.maps;
+      }
+    }
   }
 
   private selectCase(context: ValidationContext): Schema<any, any> | undefined {

@@ -16,21 +16,33 @@ export type UnionValidatorConfig<
   };
 };
 
-export class UnionSchema<
-  TVariants extends readonly [Schema<any, any>, ...Schema<any, any>[]],
-  TOutput = InferSchemaType<TVariants[number]>,
-  TInput = TOutput
-> extends Schema<TOutput, TInput> {
-  private variants: TVariants;
+type Maps = {
+  validatorMap: any;
+  preparationMap: any;
+  transformationMap: any;
+  messageMap: any;
+};
 
-  constructor(config: UnionValidatorConfig<TVariants, TOutput>) {
-    super("union", config);
+export class UnionSchema<
+  T extends readonly [Schema<any, any>, ...Schema<any, any>[]],
+  TOutput,
+  TInput
+> extends Schema<TOutput, TInput> {
+  private schemas: T;
+
+  constructor(config: UnionValidatorConfig<T, TOutput>, maps?: Maps) {
+    super("union", config, maps);
     if (!config.validate?.of) {
       throw new Error(
         "Union schema must have variants provided in `validate.of`"
       );
     }
-    this.variants = config.validate.of;
+    this.schemas = config.validate.of;
+    if (this.maps) {
+      for (const schema of this.schemas) {
+        schema.maps = this.maps;
+      }
+    }
   }
 
   async _validate(value: any, context: ValidationContext): Promise<any> {
@@ -38,7 +50,7 @@ export class UnionSchema<
     let successfulResult: any = undefined;
     let matched = false;
 
-    for (const variant of this.variants) {
+    for (const variant of this.schemas) {
       try {
         const result = await variant.safeParse(value, context.ctx);
         if (result.status === "success") {

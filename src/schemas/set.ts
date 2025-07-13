@@ -4,7 +4,15 @@ import {
   ValidationContext,
   ValidationError,
   ValidationIssue,
+  ValidatorConfig,
 } from "../types.js";
+
+type Maps = {
+  validatorMap: any;
+  preparationMap: any;
+  transformationMap: any;
+  messageMap: any;
+};
 
 export class SetSchema<
   TValue extends Schema<any, any>,
@@ -13,9 +21,16 @@ export class SetSchema<
 > extends Schema<TOutput, TInput> {
   protected valueSchema: TValue;
 
-  constructor(itemSchema: TValue, config: Record<string, unknown> = {}) {
-    super("set", config);
+  constructor(
+    itemSchema: TValue,
+    config: Record<string, unknown> = {},
+    maps?: Maps
+  ) {
+    super("set", config, maps);
     this.valueSchema = itemSchema;
+    if (this.maps) {
+      this.valueSchema.maps = this.maps;
+    }
   }
 
   async _prepare(context: ValidationContext): Promise<any> {

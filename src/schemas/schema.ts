@@ -1,4 +1,10 @@
 import {
+  baseValidatorMap,
+  basePreparationMap,
+  baseTransformationMap,
+  baseMessageMap,
+} from "../validator-map.js";
+import {
   PreparationFunction,
   TransformationFunction,
   ValidatorFunction,
@@ -10,16 +16,17 @@ import {
   SafeParseResult,
   ValidatorConfig,
   CustomValidator,
+  SchemaValidatorMap,
 } from "../types.js";
 
-import {
-  validatorMap,
-  preparationMap,
-  transformationMap,
-  messageMap,
-} from "../validator-map.js";
-
 import { StandardSchemaV1 } from "../standard-schema.js";
+
+export type Maps = {
+  validatorMap: SchemaValidatorMap;
+  preparationMap: Record<string, any>;
+  transformationMap: Record<string, any>;
+  messageMap: Record<string, any>;
+};
 
 export class Schema<TOutput, TInput = TOutput>
   implements StandardSchemaV1<TInput, TOutput>
@@ -46,10 +53,21 @@ export class Schema<TOutput, TInput = TOutput>
   public config: Record<string, unknown>;
   public label: string;
   public readonly "~standard": StandardSchemaV1.Props<TInput, TOutput>;
+  public maps: Maps;
 
-  constructor(dataType: string, config: Record<string, unknown> = {}) {
+  constructor(
+    dataType: string,
+    config: Record<string, unknown> = {},
+    maps?: Maps
+  ) {
     this.dataType = dataType;
     this.config = config; // Keep original config for modifiers
+    this.maps = maps || {
+      validatorMap: baseValidatorMap,
+      preparationMap: basePreparationMap,
+      transformationMap: baseTransformationMap,
+      messageMap: baseMessageMap,
+    };
 
     const {
       prepare,
@@ -63,9 +81,9 @@ export class Schema<TOutput, TInput = TOutput>
       (config.label as string) ||
       this.dataType.charAt(0).toUpperCase() + this.dataType.slice(1);
 
-    const validatorCollection = (validatorMap as any)[dataType];
-    const preparationCollection = (preparationMap as any)[dataType];
-    const transformationCollection = (transformationMap as any)[dataType];
+    const validatorCollection = this.maps.validatorMap[dataType];
+    const preparationCollection = this.maps.preparationMap[dataType];
+    const transformationCollection = this.maps.transformationMap[dataType];
 
     const validationRules = { ...(validate || {}), ...rest };
 
@@ -290,9 +308,8 @@ export class Schema<TOutput, TInput = TOutput>
           } else if (typeof userMessage === "function") {
             message = (userMessage as MessageProducer)(messageProducerContext);
           } else {
-            const defaultMessageProducer = (messageMap as any)[this.dataType]?.[
-              "custom"
-            ];
+            const defaultMessageProducer =
+              this.maps.messageMap[this.dataType]?.["custom"];
             if (defaultMessageProducer) {
               message = defaultMessageProducer(messageProducerContext);
             }
@@ -317,7 +334,7 @@ export class Schema<TOutput, TInput = TOutput>
     return current_value;
   }
 
-  private _createIssue(
+  protected _createIssue(
     name: string,
     args: any[],
     context: ValidationContext,
@@ -336,17 +353,19 @@ export class Schema<TOutput, TInput = TOutput>
     let message: string | undefined;
 
     const userMessage =
-      customMessage ??
+      customMessage ||
       (this.config as ValidatorConfig<any>).messages?.[
         name as keyof ValidatorConfig<any>["messages"]
-      ];
+      ] ||
+      this.maps.messageMap[this.dataType]?.[name];
 
     if (typeof userMessage === "string") {
       message = userMessage;
     } else if (typeof userMessage === "function") {
       message = (userMessage as MessageProducer)(messageProducerContext);
     } else {
-      const defaultMessageProducer = (messageMap as any)[this.dataType]?.[name];
+      const defaultMessageProducer =
+        this.maps.messageMap[this.dataType]?.[name];
       if (defaultMessageProducer) {
         message = defaultMessageProducer(messageProducerContext);
       }
