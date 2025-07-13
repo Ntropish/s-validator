@@ -16,6 +16,28 @@ export const mapPlugin = definePlugin({
       message: (ctx) =>
         `Invalid type. Expected Map, received ${typeof ctx.value}.`,
     },
+    minSize: {
+      validator: (value: Map<unknown, unknown>, [min]: [number]) =>
+        value.size >= min,
+      message: (ctx) =>
+        `${ctx.label} must contain at least ${ctx.args[0]} entries.`,
+    },
+    maxSize: {
+      validator: (value: Map<unknown, unknown>, [max]: [number]) =>
+        value.size <= max,
+      message: (ctx) =>
+        `${ctx.label} must contain at most ${ctx.args[0]} entries.`,
+    },
+    size: {
+      validator: (value: Map<unknown, unknown>, [size]: [number]) =>
+        value.size === size,
+      message: (ctx) =>
+        `${ctx.label} must contain exactly ${ctx.args[0]} entries.`,
+    },
+    nonEmpty: {
+      validator: (value: Map<unknown, unknown>) => value.size > 0,
+      message: (ctx) => `${ctx.label} must not be empty.`,
+    },
     entries: {
       validator: async (
         value: Map<unknown, unknown>,
