@@ -171,3 +171,74 @@ await schema.parse({
   // canBeMissing and canBeBoth are not present, which is valid
 }); // ✅
 ```
+
+## Recursive Schemas
+
+Defining a schema that refers to itself (e.g., for a tree-like structure) requires a special pattern to avoid an infinite loop during schema initialization. You can achieve this by using a getter (`get()`) for the recursive property within the `properties` definition.
+
+When the schema is being defined, the getter for the recursive property is not called immediately. It is only called later, during the validation process, by which time the schema it needs to refer to has been fully defined.
+
+Here is an example of a recursive schema for a file system entry, which can be a file or a directory containing other entries.
+
+```typescript
+import { s, Schema } from "s-val";
+
+type File = {
+  type: "file";
+  name: string;
+};
+
+type Directory = {
+  type: "directory";
+  name: string;
+  children: FileSystemEntry[];
+};
+
+type FileSystemEntry = File | Directory;
+
+const fileSchema = s.object({
+  validate: {
+    properties: {
+      type: s.literal("file"),
+      name: s.string(),
+    },
+  },
+});
+
+const directorySchema: Schema<Directory> = s.object({
+  validate: {
+    properties: {
+      type: s.literal("directory"),
+      name: s.string(),
+      // Use a getter for the recursive property
+      get children() {
+        return s.array(fileSystemEntrySchema);
+      },
+    },
+  },
+});
+
+const fileSystemEntrySchema: Schema<FileSystemEntry> = s.union({
+  validate: {
+    of: [fileSchema, directorySchema],
+  },
+});
+
+// A valid recursive structure
+const data = {
+  type: "directory",
+  name: "root",
+  children: [
+    { type: "file", name: "file1.txt" },
+    {
+      type: "directory",
+      name: "subdir",
+      children: [{ type: "file", name: "file2.txt" }],
+    },
+  ],
+};
+
+await fileSystemEntrySchema.parse(data); // ✅
+```
+
+Note that this pattern is more concise and often clearer than using `s.lazy()`, especially for self-referential object properties.

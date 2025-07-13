@@ -4,7 +4,7 @@ The `s.union()` validator allows you to combine multiple schemas into one. The v
 
 ## Usage
 
-You create a union schema by passing a configuration object to `s.union()`. The schemas to be validated against are provided in an array under the `validate.variants` key.
+You create a union schema by passing a configuration object to `s.union()`. The schemas to be validated against are provided in an array under the `validate.of` key.
 
 ### Union of Primitive Types
 
@@ -15,7 +15,7 @@ import { s } from "s-val";
 
 const stringOrNumberSchema = s.union({
   validate: {
-    variants: [s.string(), s.number()],
+    of: [s.string(), s.number()],
   },
 });
 
@@ -38,7 +38,7 @@ import { s } from "s-val";
 
 const contactSchema = s.union({
   validate: {
-    variants: [
+    of: [
       // Shape for an email contact
       s.object({
         validate: {
@@ -75,6 +75,81 @@ try {
 }
 ```
 
+## Top-level Configuration
+
+Like other validators, `s.union` can be configured with top-level preparations, transformations, and custom validators. These are applied to the union as a whole.
+
+### Top-level Preparations
+
+A `prepare` function can modify the input before any of the variant schemas are tested.
+
+```typescript
+const schema = s.union({
+  validate: { of: [s.number(), s.boolean()] },
+  prepare: {
+    custom: [
+      (value) => {
+        if (typeof value === "string" && !isNaN(Number(value))) {
+          return Number(value);
+        }
+        return value;
+      },
+    ],
+  },
+});
+
+// The string "123" is prepared into the number 123, which then passes.
+await schema.parse("123"); // ✅ Resolves to 123
+```
+
+### Top-level Transformations
+
+A `transform` function is applied **after** a value has successfully passed validation against one of the variants.
+
+```typescript
+const schema = s.union({
+  validate: { of: [s.string(), s.number()] },
+  transform: {
+    custom: [(value) => ({ data: value })],
+  },
+});
+
+await schema.parse("hello"); // ✅ Resolves to { data: "hello" }
+await schema.parse(123); // ✅ Resolves to { data: 123 }
+```
+
+### Top-level Custom Validation
+
+You can add a `validate` block with a `custom` validator to the union itself. This is useful for providing a custom error message if none of the variants match.
+
+The custom validator on the union runs **only if** all the variant schemas fail.
+
+```typescript
+const customMessage = "Input must be a string or a number.";
+
+const schema = s.union({
+  validate: {
+    of: [s.string(), s.number()],
+    custom: [
+      {
+        name: "union_error",
+        validator: () => false, // Always fail to trigger the message
+      },
+    ],
+  },
+  messages: {
+    union_error: customMessage,
+  },
+});
+
+const result = await schema.safeParse(true); // ❌
+
+if (result.status === "error") {
+  // The first issue will be our custom message
+  console.log(result.error.issues[0].message); // "Input must be a string or a number."
+}
+```
+
 ## Error Handling
 
-If a value fails to validate against all of the schemas in the union, the `ValidationError` will contain a collection of all the issues encountered while trying each schema. This can be useful for debugging why a value failed validation.
+If a value fails to validate against all of the schemas in the union, the `ValidationError` will contain a collection of all the issues encountered. If a top-level custom validator is used, its issue will appear first in the list.

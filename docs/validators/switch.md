@@ -90,3 +90,89 @@ try {
   console.log(e.issues);
 }
 ```
+
+## Top-level Configuration
+
+The `s.switch` validator can be configured with top-level preparations, transformations, and custom validators. These are applied to the switch as a whole, before and after the case-specific schema is processed.
+
+- **`prepare`**: Runs before the `select` function is called and before the case-specific schema's preparations.
+- **`validate`**: Runs after the top-level preparations but before the case-specific validation.
+- **`transform`**: Runs after the case-specific schema has successfully transformed the value.
+
+### Example: Top-level Modifiers
+
+This example demonstrates how you can use top-level modifiers to preprocess data, add extra validation, and post-process the final result.
+
+```typescript
+import { s } from "s-val";
+
+const customMessage = "Input value must be greater than 0";
+
+const schema = s.switch({
+  // 1. Top-level Preparation
+  prepare: {
+    custom: [
+      (data) => {
+        // Coerce string value to a number before validation
+        if (typeof data.value === "string") {
+          return { ...data, value: Number(data.value) };
+        }
+        return data;
+      },
+    ],
+  },
+
+  // 2. Top-level Validation
+  validate: {
+    custom: [
+      {
+        name: "must_be_positive",
+        // This validation runs before the case-specific validation
+        validator: (data) => data.value > 0,
+      },
+    ],
+  },
+  messages: {
+    must_be_positive: customMessage,
+  },
+
+  // 3. Switch Logic
+  select: (ctx) => ctx.value.type,
+  cases: {
+    a: s.object({
+      validate: {
+        properties: {
+          type: s.literal("a"),
+          // This validator runs after the top-level one
+          value: s.number({ validate: { multipleOf: 2 } }),
+        },
+      },
+    }),
+  },
+
+  // 4. Top-level Transformation
+  transform: {
+    custom: [
+      (data) => {
+        // This transform runs after the case-specific schema passes
+        return { ...data, transformed: true };
+      },
+    ],
+  },
+});
+
+// --- SUCCESS CASE ---
+// 'prepare' turns value "10" into 10.
+// 'validate' checks that 10 > 0.
+// Case 'a' validates that 10 is a multiple of 2.
+// 'transform' adds the `transformed: true` flag.
+const result = await schema.parse({ type: "a", value: "10" });
+console.log(result); // { type: 'a', value: 10, transformed: true } ✅
+
+// --- FAILURE CASE (TOP-LEVEL) ---
+const failedResult = await schema.safeParse({ type: "a", value: -4 }); // ❌
+if (failedResult.status === "error") {
+  // Fails on the top-level 'must_be_positive' validator
+  console.log(failedResult.error.issues[0].message); // "Input value must be greater than 0"
+}
+```
