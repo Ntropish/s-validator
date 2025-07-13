@@ -222,7 +222,7 @@ The compatibility interface is available under the `~standard` property on any s
 
 ```typescript
 import { s } from "s-val";
-import type { StandardSchemaV1 } from "s-val";
+import type { StandardSchemaV1 } from "s-val/dist/standard-schema";
 
 const userSchema = s.object({
   validate: {

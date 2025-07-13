@@ -49,21 +49,23 @@ describe("Advanced Scenario", () => {
         }),
 
         // Array of objects
-        posts: s.array({
-          validate: {
-            ofType: s.object({
-              validate: {
-                properties: {
-                  title: s.string({ validate: { minLength: 5 } }),
-                  content: s.string(),
-                  // A date that can be from a string
-                  createdAt: s.date({ prepare: { coerce: true } }),
-                },
+        posts: s.array(
+          s.object({
+            validate: {
+              properties: {
+                title: s.string({ validate: { minLength: 5 } }),
+                content: s.string(),
+                // A date that can be from a string
+                createdAt: s.date({ prepare: { coerce: true } }),
               },
-            }),
-            minLength: 1,
-          },
-        }),
+            },
+          }),
+          {
+            validate: {
+              minLength: 1,
+            },
+          }
+        ),
       },
       custom: [
         {

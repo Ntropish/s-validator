@@ -4,17 +4,16 @@ The `set` validator checks if a value is a `Set` and validates its items against
 
 ## Usage
 
-You create a set schema by passing a configuration object to the `s.set()` method.
+You create a set schema by passing the item schema as the first argument to `s.set()`. The second argument is an optional configuration object.
 
-- `valueSchema`: The schema to use for validating each item in the set.
+- **Item Schema**: The schema to use for validating each element in the set.
+- **Config Object**: An object for additional validation rules.
 
 ```typescript
 import { s } from "s-val";
 
 // A set where all items must be strings with a length of at least 3
-const tagsSchema = s.set({
-  valueSchema: s.string({ min: 3 }),
-});
+const tagsSchema = s.set(s.string({ validate: { minLength: 3 } }));
 
 const tags = new Set(["typescript", "react", "css"]);
 await tagsSchema.parse(tags); // ✅
@@ -29,7 +28,7 @@ try {
   [
     {
       path: [ 0 ],
-      message: 'String must contain at least 3 character(s)'
+      message: 'String must be at least 3 characters long'
     }
   ]
   */
@@ -43,16 +42,18 @@ You can provide custom error messages for any validation rule, including the `id
 ```typescript
 import { s } from "s-val";
 
-const customSetSchema = s.set({
-  valueSchema: s.number({
+const customSetSchema = s.set(
+  s.number({
     messages: {
       identity: "All items in the set must be numbers.",
     },
   }),
-  messages: {
-    identity: "The provided value must be a Set.",
-  },
-});
+  {
+    messages: {
+      identity: "The provided value must be a Set.",
+    },
+  }
+);
 
 try {
   await customSetSchema.parse(["not-a-set"]); // ❌

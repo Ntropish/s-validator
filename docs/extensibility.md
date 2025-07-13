@@ -18,7 +18,7 @@ Let's create a custom schema that validates and formats a US phone number. We wa
 Create a new file, for example, `phone-number-schema.ts`. In this file, you'll define your new schema class.
 
 ```typescript
-import { s, type ValidationContext, type ValidationError } from "s-val";
+import { s, ValidationError, type ValidationContext } from "s-val";
 
 const PHONE_REGEX = /^\d{10}$/;
 
@@ -29,12 +29,13 @@ export class PhoneNumberSchema extends s.Schema<string, string> {
   }
 
   // The _validate method checks the input after basic type checks.
-  async _validate(value: any, context: ValidationContext): Promise<any> {
+  // It should throw a ValidationError on failure and return void on success.
+  async _validate(value: any, context: ValidationContext): Promise<void> {
     // First, run the base validation from s.Schema (handles optional, nullable, etc.)
     await super._validate(value, context);
 
     if (typeof value !== "string" || !PHONE_REGEX.test(value)) {
-      throw new s.ValidationError([
+      throw new ValidationError([
         {
           path: context.path,
           message: "Must be a 10-digit phone number.",

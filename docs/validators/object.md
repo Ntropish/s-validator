@@ -120,6 +120,32 @@ const nameOnlySchema = userSchema.omit(["id", "email"]);
 // Creates a schema with only `name`
 ```
 
+### `.extend()`
+
+You can add or overwrite properties on an existing object schema using the `.extend()` method. This is useful for building up complex schemas from smaller, reusable parts.
+
+```typescript
+const baseUserSchema = s.object({
+  validate: {
+    properties: {
+      id: s.number(),
+    },
+  },
+});
+
+const fullUserSchema = baseUserSchema.extend({
+  name: s.string(),
+  email: s.string({ validate: { email: true } }),
+});
+
+// This schema now requires id, name, and email.
+await fullUserSchema.parse({
+  id: 1,
+  name: "John",
+  email: "john@example.com",
+}); // ✅
+```
+
 ## Optional and Nullable Properties
 
 You can mark individual properties as optional or nullable within their own schema definitions.

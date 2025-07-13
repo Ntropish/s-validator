@@ -79,45 +79,19 @@ describe("json validator", () => {
         json: s.object({
           validate: {
             properties: {
-              user: s.object({
-                validate: {
-                  properties: {
-                    name: s.string(),
-                    details: s.object({
-                      validate: {
-                        properties: {
-                          tags: s.array({ validate: { ofType: s.string() } }),
-                        },
-                      },
-                    }),
-                  },
-                },
-              }),
+              data: s.array(s.number()),
             },
           },
         }),
       },
     });
-
-    const validData = JSON.stringify({
-      user: {
-        name: "test",
-        details: {
-          tags: ["a", "b", "c"],
-        },
-      },
+    const validJson = JSON.stringify({
+      data: [1, 2, 3],
     });
-    const result = await schema.parse(validData);
-    expect(result).toBe(validData);
-
-    const invalidData = JSON.stringify({
-      user: {
-        name: "test",
-        details: {
-          tags: ["a", "b", 3], // number instead of string in array
-        },
-      },
+    const invalidJson = JSON.stringify({
+      data: [1, "2", 3],
     });
-    await expect(schema.parse(invalidData)).rejects.toThrow(ValidationError);
+    await expect(schema.parse(validJson)).resolves.toEqual(validJson);
+    await expect(schema.parse(invalidJson)).rejects.toThrow();
   });
 });

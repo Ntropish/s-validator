@@ -36,7 +36,9 @@ All validation rules are passed inside a `validate` object in the configuration.
 - `min: number`: Checks if the number is greater than or equal to the value.
 - `max: number`: Checks if the number is less than or equal to the value.
 - `gt: number`: Checks if the number is strictly greater than the value.
+- `gte: number`: Checks if the number is greater than or equal to the value.
 - `lt: number`: Checks if the number is strictly less than the value.
+- `lte: number`: Checks if the number is less than or equal to the value.
 - `integer: boolean`: Checks if the number is an integer.
 - `positive: boolean`: Checks if the number is positive (> 0).
 - `negative: boolean`: Checks if the number is negative (< 0).
@@ -80,11 +82,13 @@ const priceSchema = s.number({
     min: 0,
   },
   transform: {
-    custom: (value) =>
-      value.toLocaleString("en-US", {
-        style: "currency",
-        currency: "USD",
-      }),
+    custom: [
+      (value) =>
+        value.toLocaleString("en-US", {
+          style: "currency",
+          currency: "USD",
+        }),
+    ],
   },
 });
 

@@ -33,14 +33,14 @@ describe("s.infer", () => {
     const objectData: ObjectType = { name: "test", age: 30 };
     expect(typeof objectData).toBe("object");
 
-    const arraySchema = s.array({ validate: { ofType: s.string() } });
+    const arraySchema = s.array(s.string());
     type ArrayType = s.infer<typeof arraySchema>;
     const arrayData: ArrayType = ["a", "b"];
     expect(Array.isArray(arrayData)).toBe(true);
 
     const unionSchema = s.union({
       validate: {
-        ofType: [s.string(), s.number()],
+        variants: [s.string(), s.number()],
       },
     });
     type UnionType = s.infer<typeof unionSchema>;

@@ -128,7 +128,7 @@ const handleSchema = s.string({
     minLength: 3,
   },
   transform: {
-    custom: (value) => `@${value}`,
+    custom: [(value) => `@${value}`],
   },
 });
 

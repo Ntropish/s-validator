@@ -36,7 +36,6 @@ type Builder = {
     itemSchema: T,
     config?: ValidatorConfig<any>
   ): ArraySchema<T, InferSchemaType<T>[]>;
-  array(config?: ValidatorConfig<any>): ArraySchema<Schema<any, any>, any[]>;
   object<P extends SObjectProperties>(
     config: ValidatorConfig<any> & { validate?: { properties?: P } }
   ): ObjectSchema<P, InferSObjectType<P>>;
@@ -66,17 +65,10 @@ function createSchemaBuilder(): Builder {
     if (plugin.dataType === "switch") continue;
     if (plugin.dataType === "array") {
       builder.array = <T extends Schema<any, any>>(
-        itemSchemaOrConfig?: T | ValidatorConfig<any>,
+        itemSchema: T,
         config: ValidatorConfig<any> = {}
       ) => {
-        if (itemSchemaOrConfig instanceof Schema) {
-          return new ArraySchema(itemSchemaOrConfig, config);
-        }
-
-        const configObj = itemSchemaOrConfig ?? {};
-        const itemSchema =
-          (configObj as any)?.validate?.ofType ?? new Schema("any");
-        return new ArraySchema(itemSchema, configObj);
+        return new ArraySchema(itemSchema, config);
       };
       continue;
     }

@@ -4,19 +4,16 @@ The `array` validator checks if a value is an array and can validate its content
 
 ## Usage
 
-You create an array schema by passing a single configuration object to `s.array()`. All validation rules, including the schema for the array's items, must be placed inside a `validate` object within this configuration.
+You create an array schema by passing the item schema as the first argument to `s.array()`. The second argument is an optional configuration object for additional validation rules.
 
-- `validate.ofType`: The schema to use for validating each element in the array. This is the most important property.
+- **Item Schema**: The schema to use for validating each element in the array.
+- **Config Object**: An object for validation rules like `minLength`, `maxLength`, etc.
 
 ```typescript
 import { s } from "s-val";
 
 // An array where all items must be strings.
-const stringArraySchema = s.array({
-  validate: {
-    ofType: s.string(),
-  },
-});
+const stringArraySchema = s.array(s.string());
 
 await stringArraySchema.parse(["hello", "world"]); // ✅
 
@@ -30,20 +27,19 @@ try {
 
 ## Validation Rules
 
-All validation rules are placed within the `validate` object.
+All validation rules are placed within the `validate` object in the second argument.
 
 ### `items` (For Tuples)
 
-To validate an array with a specific sequence of types (a tuple), use the `items` property. The array must have the same number of elements as the provided `schemas` array. If you use `items`, you should also provide a base `ofType` schema (like `s.any()`) for the initial type check.
+To validate an array with a specific sequence of types (a tuple), use the `items` property. The array must have the same number of elements as the provided `schemas` array.
 
 - **Type**: `Schema[]`
-- **Example**: `s.array({ validate: { ofType: s.any(), items: [s.string(), s.number()] } })`
+- **Example**: `s.array(s.any(), { validate: { items: [s.string(), s.number()] } })`
 
 ```typescript
 // A tuple of [string, number]
-const tupleSchema = s.array({
+const tupleSchema = s.array(s.any(), {
   validate: {
-    ofType: s.any(),
     items: [s.string(), s.number()],
   },
 });
@@ -64,9 +60,8 @@ await tupleSchema.parse(["hello"]); // ❌ (must have exactly 2 items)
 
 ```typescript
 // An array that must contain between 2 and 4 numbers.
-const schema = s.array({
+const schema = s.array(s.number(), {
   validate: {
-    ofType: s.number(),
     minLength: 2,
     maxLength: 4,
   },
@@ -87,9 +82,8 @@ await schema.parse([1, 2, 3, 4, 5]); // ❌
 **Example:**
 
 ```typescript
-const schema = s.array({
+const schema = s.array(s.string(), {
   validate: {
-    ofType: s.string(),
     contains: "a",
     excludes: "d",
     unique: true,
